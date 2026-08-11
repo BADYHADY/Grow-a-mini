@@ -15,6 +15,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local LOAD_ORDER = {
 	"AnalyticsService",
 	"DataService",
+	"MiniAvatarService",
 }
 
 local registry = {}
