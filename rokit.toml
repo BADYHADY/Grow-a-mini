@@ -1,0 +1,8 @@
+# Toolchain for Grow a Mini Fighter.
+# Install everything listed here with:  rokit install
+#
+# If a version below no longer exists, run `rokit add rojo-rbx/rojo` to pull the
+# current release and commit the updated pin.
+
+[tools]
+rojo = "rojo-rbx/rojo@7.7.0"

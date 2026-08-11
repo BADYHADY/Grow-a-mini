@@ -1,0 +1,14 @@
+# Luau and config files stay LF so diffs are stable across machines and so
+# Rojo never sees a spurious change from a line-ending flip.
+* text=auto eol=lf
+
+# Binary. Git cannot merge these -- only one person edits place.rbxl at a time.
+*.rbxl  binary
+*.rbxlx binary
+*.rbxm  binary
+*.rbxmx binary
+*.png   binary
+*.jpg   binary
+*.ogg   binary
+*.mp3   binary
+*.fbx   binary

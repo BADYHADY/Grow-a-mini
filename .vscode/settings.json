@@ -1,0 +1,15 @@
+{
+  "luau-lsp.platform.type": "roblox",
+  "luau-lsp.types.roblox": true,
+  "luau-lsp.sourcemap.enabled": true,
+  "luau-lsp.sourcemap.autogenerate": true,
+  "luau-lsp.sourcemap.rojoProjectFile": "default.project.json",
+  "luau-lsp.ignoreGlobs": ["**/Packages/**"],
+  "files.associations": {
+    "*.luau": "luau"
+  },
+  "[luau]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  }
+}

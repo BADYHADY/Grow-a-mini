@@ -1,0 +1,21 @@
+# Studio lock files and temp saves
+*.rbxl.lock
+*.rbxlx.lock
+*.rbxl.bak
+~$*
+
+# Generated
+sourcemap.json
+/build/
+
+# Toolchain
+.rokit/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# NOTE: place.rbxl IS committed on purpose. It holds the map, GUI instances and
+# rigs -- things Rojo does not manage. Git cannot merge it, so only one person
+# edits it at a time. All Luau lives in src/ and diffs cleanly.
