@@ -154,7 +154,7 @@ end
 -- fallback when a fetch fails. Spawning must never block on the network.
 function MiniAvatarService.buildBlank(): Model
 	local description = Instance.new("HumanoidDescription")
-	local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R6)
+	local model = Players:CreateHumanoidModelFromDescriptionAsync(description, Enum.HumanoidRigType.R6)
 	model.Name = "Mini_Blank"
 
 	for _, descendant in model:GetDescendants() do
@@ -192,7 +192,7 @@ end
 
 -- Builds the Mini for a user. Never throws and never returns nil: a failed
 -- avatar fetch produces a blank Mini rather than a player with no Mini at all.
-function MiniAvatarService.build(userId: number): Model
+function MiniAvatarService.buildAsync(userId: number): Model
 	local description = MiniAvatarService.getDescription(userId)
 	if not description then
 		return MiniAvatarService.buildBlank()
@@ -203,7 +203,7 @@ function MiniAvatarService.build(userId: number): Model
 	trimAccessories(trimmed)
 
 	local ok, model = pcall(function()
-		return Players:CreateHumanoidModelFromDescription(trimmed, Enum.HumanoidRigType.R6)
+		return Players:CreateHumanoidModelFromDescriptionAsync(trimmed, Enum.HumanoidRigType.R6)
 	end)
 
 	if not ok or not model then
