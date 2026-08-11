@@ -9,7 +9,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Stats = game:GetService("Stats")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
@@ -71,7 +70,9 @@ local function refresh(fps: number)
 		return
 	end
 
-	local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+	-- Player:GetNetworkPing rather than Stats.Network: reading a StatsItem needs
+	-- the Plugin capability, which a LocalScript does not have.
+	local ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 1000)
 
 	local lines = {
 		string.format("%d fps   worst %.1f ms", fps, worstFrameMs),
