@@ -1,8 +1,11 @@
 --!nonstrict
--- Client-side visual locomotion and personality for Minis.
+-- Mini movement presentation.
 --
--- Server owns the Mini and gameplay state.
--- This controller only decides how the companion LOOKS while following.
+-- The Mini does NOT have a fake procedural walk cycle.
+--
+-- Its visible body pose is mirrored directly from the owner's real Roblox
+-- character every frame. Run, idle, jump, emotes and custom avatar animations
+-- therefore naturally flow through to the Mini.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,13 +20,6 @@ local SETTINGS = MiniConfig.Personality
 
 local MiniController = {}
 
-type MotorSet = {
-LeftShoulder: Motor6D?,
-RightShoulder: Motor6D?,
-LeftHip: Motor6D?,
-RightHip: Motor6D?,
-Neck: Motor6D?,
-}
 
 type MiniState = {
 model: Model,
@@ -32,30 +28,40 @@ owner: Player,
 position: Vector3,
 velocity: Vector3,
 forward: Vector3,
-
 groundOffset: number,
 
-gaitPhase: number,
-gaitBlend: number,
+sourceCharacter: Model?,
+sourceJoints: { [string]: any },
+targetJoints: { [string]: any },
 
-phaseOffset: number,
-motors: MotorSet,
+reportedJointCount: boolean,
 }
+
 
 local minisFolder: Folder
 local states: { [Model]: MiniState } = {}
 
 local raycastParams = RaycastParams.new()
-raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+raycastParams.FilterType =
+Enum.RaycastFilterType.Exclude
+
 raycastParams.IgnoreWater = true
 
 
 local function horizontal(vector: Vector3): Vector3
-return Vector3.new(vector.X, 0, vector.Z)
+return Vector3.new(
+vector.X,
+0,
+vector.Z
+)
 end
 
 
-local function safeUnit(vector: Vector3, fallback: Vector3): Vector3
+local function safeUnit(
+vector: Vector3,
+fallback: Vector3
+): Vector3
+
 local flat = horizontal(vector)
 
 if flat.Magnitude < 0.001 then
@@ -66,15 +72,27 @@ return flat.Unit
 end
 
 
+local function expAlpha(
+response: number,
+dt: number
+): number
+
+return 1 - math.exp(-response * dt)
+end
+
+
 local function moveTowards(
 current: Vector3,
 target: Vector3,
 maxDelta: number
 ): Vector3
+
 local delta = target - current
 local distance = delta.Magnitude
 
-if distance <= maxDelta or distance < 0.0001 then
+if distance <= maxDelta
+or distance < 0.0001
+then
 return target
 end
 
@@ -82,35 +100,183 @@ return current + delta.Unit * maxDelta
 end
 
 
-local function expAlpha(response: number, dt: number): number
-return 1 - math.exp(-response * dt)
+-- ============================================================
+-- JOINT MIRRORING
+--
+-- Supports BOTH Roblox joint generations:
+--
+-- legacy Motor6D
+-- modern AnimationConstraint
+-- ============================================================
+
+local function isPoseJoint(
+instance: Instance
+): boolean
+
+return instance:IsA("Motor6D")
+or instance:IsA("AnimationConstraint")
 end
 
 
-local function findMotor(model: Model, name: string): Motor6D?
-for _, descendant in model:GetDescendants() do
-if descendant:IsA("Motor6D") and descendant.Name == name then
-return descendant
+local function jointKey(
+joint: Instance
+): string?
+
+if joint:IsA("Motor6D") then
+local part0 = joint.Part0
+local part1 = joint.Part1
+
+if not part0 or not part1 then
+return nil
 end
+
+return part0.Name .. ">" .. part1.Name
 end
+
+
+if joint:IsA("AnimationConstraint") then
+local attachment0 = joint.Attachment0
+local attachment1 = joint.Attachment1
+
+if not attachment0
+or not attachment1
+or not attachment0.Parent
+or not attachment1.Parent
+then
+return nil
+end
+
+return attachment0.Parent.Name
+.. ">"
+.. attachment1.Parent.Name
+end
+
 
 return nil
 end
 
 
-local function collectMotors(model: Model): MotorSet
-return {
-LeftShoulder = findMotor(model, "Left Shoulder"),
-RightShoulder = findMotor(model, "Right Shoulder"),
-LeftHip = findMotor(model, "Left Hip"),
-RightHip = findMotor(model, "Right Hip"),
-Neck = findMotor(model, "Neck"),
-}
+local function collectPoseJoints(
+model: Model
+): { [string]: any }
+
+local result = {}
+
+for _, descendant in model:GetDescendants() do
+if not isPoseJoint(descendant) then
+continue
+end
+
+local key = jointKey(descendant)
+
+if key then
+result[key] = descendant
+end
+end
+
+return result
 end
 
 
-local function calculateGroundOffset(model: Model): number
-local pivotY = model:GetPivot().Position.Y
+local function readTransform(
+joint: Instance
+): CFrame
+
+if joint:IsA("Motor6D") then
+return joint.Transform
+end
+
+if joint:IsA("AnimationConstraint") then
+return joint.Transform
+end
+
+return CFrame.identity
+end
+
+
+local function writeTransform(
+joint: Instance,
+transform: CFrame
+)
+if joint:IsA("Motor6D") then
+joint.Transform = transform
+return
+end
+
+if joint:IsA("AnimationConstraint") then
+joint.Transform = transform
+end
+end
+
+
+local function rebuildSourceJoints(
+state: MiniState,
+character: Model
+)
+state.sourceCharacter = character
+state.sourceJoints =
+collectPoseJoints(character)
+
+state.reportedJointCount = false
+end
+
+
+local function mirrorPose(state: MiniState)
+local character =
+state.owner.Character
+
+if not character then
+return
+end
+
+if state.sourceCharacter ~= character then
+rebuildSourceJoints(
+state,
+character
+)
+end
+
+
+local matched = 0
+
+for key, sourceJoint in state.sourceJoints do
+local targetJoint =
+state.targetJoints[key]
+
+if targetJoint then
+writeTransform(
+targetJoint,
+readTransform(sourceJoint)
+)
+
+matched += 1
+end
+end
+
+
+if GameConfig.DebugLogging
+and not state.reportedJointCount
+then
+state.reportedJointCount = true
+
+print(
+`[MiniController] pose mirror {state.owner.Name}: {matched} matching joints`
+)
+end
+end
+
+
+-- ============================================================
+-- ROOT FOLLOW
+-- ============================================================
+
+local function calculateGroundOffset(
+model: Model
+): number
+
+local pivotY =
+model:GetPivot().Position.Y
+
 local lowestY = math.huge
 
 for _, descendant in model:GetDescendants() do
@@ -118,8 +284,9 @@ if not descendant:IsA("BasePart") then
 continue
 end
 
--- Hair/hat size must not affect where the Mini's feet touch ground.
-if descendant:FindFirstAncestorOfClass("Accessory") then
+if descendant:FindFirstAncestorOfClass(
+"Accessory"
+) then
 continue
 end
 
@@ -127,45 +294,64 @@ local bottom =
 descendant.Position.Y
 - descendant.Size.Y * 0.5
 
-lowestY = math.min(lowestY, bottom)
+lowestY =
+math.min(
+lowestY,
+bottom
+)
 end
 
 if lowestY == math.huge then
 return 1
 end
 
-return math.max(0.1, pivotY - lowestY)
+return math.max(
+0.1,
+pivotY - lowestY
+)
 end
 
 
-local function ownerFromMini(model: Model): Player?
-local userId = model:GetAttribute("OwnerUserId")
+local function ownerFromMini(
+model: Model
+): Player?
+
+local userId =
+model:GetAttribute("OwnerUserId")
 
 if type(userId) ~= "number" then
 return nil
 end
 
-return Players:GetPlayerByUserId(userId)
+return Players:GetPlayerByUserId(
+userId
+)
 end
 
 
-local function register(instance: Instance)
+local function register(
+instance: Instance
+)
 if not instance:IsA("Model") then
 return
 end
 
 task.defer(function()
-if not instance.Parent or states[instance] then
+if not instance.Parent
+or states[instance]
+then
 return
 end
 
-local owner = ownerFromMini(instance)
+local owner =
+ownerFromMini(instance)
 
 if not owner then
 return
 end
 
-local pivot = instance:GetPivot()
+local pivot =
+instance:GetPivot()
 
 states[instance] = {
 model = instance,
@@ -179,39 +365,47 @@ pivot.LookVector,
 Vector3.new(0, 0, -1)
 ),
 
-groundOffset = calculateGroundOffset(instance),
+groundOffset =
+calculateGroundOffset(
+instance
+),
 
-gaitPhase = 0,
-gaitBlend = 0,
+sourceCharacter = nil,
+sourceJoints = {},
 
-phaseOffset = (owner.UserId % 1000) * 0.037,
+targetJoints =
+collectPoseJoints(
+instance
+),
 
-motors = collectMotors(instance),
+reportedJointCount = false,
 }
 
 if GameConfig.DebugLogging then
 print(
-`[MiniController] tracking Mini for {owner.Name}`
+`[MiniController] tracking R15 Mini for {owner.Name}`
 )
 end
 end)
 end
 
 
-local function unregister(instance: Instance)
+local function unregister(
+instance: Instance
+)
 if instance:IsA("Model") then
 states[instance] = nil
 end
 end
 
 
-local function getDesiredPosition(
+local function targetPosition(
 state: MiniState,
 root: BasePart,
 character: Model
 ): Vector3
 
-local rawTarget =
+local raw =
 root.CFrame:PointToWorldSpace(
 Vector3.new(
 SETTINGS.SideOffsetStuds,
@@ -225,449 +419,251 @@ character,
 minisFolder,
 }
 
-local rayOrigin = Vector3.new(
-rawTarget.X,
-rawTarget.Y + SETTINGS.GroundProbeHeightStuds,
-rawTarget.Z
+
+local origin =
+Vector3.new(
+raw.X,
+raw.Y
++ SETTINGS.GroundProbeHeightStuds,
+raw.Z
 )
 
-local hit = Workspace:Raycast(
-rayOrigin,
+
+local hit =
+Workspace:Raycast(
+origin,
+
 Vector3.new(
 0,
 -SETTINGS.GroundProbeDistanceStuds,
 0
 ),
+
 raycastParams
 )
 
+
 if hit then
 return Vector3.new(
-rawTarget.X,
-hit.Position.Y + state.groundOffset,
-rawTarget.Z
+raw.X,
+
+hit.Position.Y
++ state.groundOffset,
+
+raw.Z
 )
 end
 
-local humanoid =
-character:FindFirstChildOfClass("Humanoid")
-
-local floorY =
-root.Position.Y
-- root.Size.Y * 0.5
-- (humanoid and humanoid.HipHeight or 2)
 
 return Vector3.new(
-rawTarget.X,
-floorY + state.groundOffset,
-rawTarget.Z
+raw.X,
+state.position.Y,
+raw.Z
 )
 end
 
 
-local function animateRun(
-state: MiniState,
-speed: number,
-dt: number
-)
-local motors = state.motors
-
-local moving =
-speed > 0.65
-
-local desiredBlend =
-if moving then 1 else 0
-
-state.gaitBlend +=
-(desiredBlend - state.gaitBlend)
-* expAlpha(10, dt)
-
--- The gait advances from DISTANCE travelled.
--- If speed doubles, foot cadence naturally increases too.
-state.gaitPhase +=
-speed
-* SETTINGS.GaitRadiansPerStud
-* dt
-
-local stride =
-math.sin(state.gaitPhase)
-
-local blend = state.gaitBlend
-
-local armSwing =
-math.rad(SETTINGS.WalkSwingDegrees)
-* stride
-* blend
-
-local legSwing =
-armSwing * 0.85
-
-local idleArm =
-math.rad(SETTINGS.IdleArmDegrees)
-* (1 - blend)
-
-if motors.RightShoulder then
-motors.RightShoulder.Transform =
-CFrame.Angles(
-armSwing,
-0,
-idleArm
-)
-end
-
-if motors.LeftShoulder then
-motors.LeftShoulder.Transform =
-CFrame.Angles(
--armSwing,
-0,
--idleArm
-)
-end
-
--- Arms and opposite legs move together like a real run.
-if motors.RightHip then
-motors.RightHip.Transform =
-CFrame.Angles(
--legSwing,
-0,
-0
-)
-end
-
-if motors.LeftHip then
-motors.LeftHip.Transform =
-CFrame.Angles(
-legSwing,
-0,
-0
-)
-end
-
-if motors.Neck then
-local tinyIdleNod =
-math.sin(
-os.clock() * SETTINGS.IdleBobFrequency
-+ state.phaseOffset
-)
-* math.rad(1)
-* (1 - blend)
-
-motors.Neck.Transform =
-CFrame.Angles(
-tinyIdleNod,
-0,
-0
-)
-end
-end
-
-
-local function updateMini(
+local function updateRoot(
 state: MiniState,
 dt: number
 )
-local model = state.model
-local owner = state.owner
-
-if not model.Parent or owner.Parent ~= Players then
-states[model] = nil
-return
-end
-
-local character = owner.Character
+local character =
+state.owner.Character
 
 if not character then
 return
 end
 
-local root =
-character:FindFirstChild("HumanoidRootPart")
 
-if not root or not root:IsA("BasePart") then
+local root =
+character:FindFirstChild(
+"HumanoidRootPart"
+)
+
+if not root
+or not root:IsA("BasePart")
+then
 return
 end
 
+
 local desired =
-getDesiredPosition(
+targetPosition(
 state,
 root,
 character
 )
 
-local flatPosition =
-Vector3.new(
-state.position.X,
-0,
-state.position.Z
-)
+
+local flatCurrent =
+horizontal(state.position)
 
 local flatDesired =
-Vector3.new(
-desired.X,
-0,
-desired.Z
-)
+horizontal(desired)
 
-local toTarget =
-flatDesired - flatPosition
+local difference =
+flatDesired - flatCurrent
 
 local distance =
-toTarget.Magnitude
+difference.Magnitude
 
 
--- Emergency recovery only.
-if distance >= MiniConfig.TeleportDistanceStuds then
+if distance
+>= MiniConfig.TeleportDistanceStuds
+then
 state.position = desired
 state.velocity = Vector3.zero
 
-model:PivotTo(
-CFrame.lookAt(
-desired,
-desired + state.forward
-)
-)
-
-return
-end
-
-
--- --------------------------------------------------------
--- ARRIVAL BEHAVIOUR
---
--- Old version:
--- snap toward an exact target at full speed.
---
--- New:
--- accelerate, cruise, then naturally brake into position.
--- --------------------------------------------------------
-
+else
 local desiredVelocity =
 Vector3.zero
 
-if distance > SETTINGS.StopRadiusStuds then
-local direction =
-toTarget.Unit
 
-local arrivalFactor =
+if distance
+> SETTINGS.StopRadiusStuds
+then
+local direction =
+difference.Unit
+
+
+local arrival =
 math.clamp(
 (
 distance
 - SETTINGS.StopRadiusStuds
 )
 / SETTINGS.ArrivalRadiusStuds,
+
 0,
 1
 )
 
--- Smoothstep instead of a linear throttle.
-arrivalFactor =
-arrivalFactor
-* arrivalFactor
-* (3 - 2 * arrivalFactor)
+
+arrival =
+arrival
+* arrival
+* (3 - 2 * arrival)
+
 
 local catchMultiplier = 1
 
-if distance > SETTINGS.CatchUpStartStuds then
-local extra =
-(
-distance
-- SETTINGS.CatchUpStartStuds
-)
-/ SETTINGS.CatchUpStartStuds
 
+if distance
+> SETTINGS.CatchUpStartStuds
+then
 catchMultiplier =
 math.clamp(
-1 + extra,
+distance
+/ SETTINGS.CatchUpStartStuds,
+
 1,
 SETTINGS.MaxSpeedMultiplier
 )
 end
 
-local desiredSpeed =
-MiniConfig.MoveSpeed
-* arrivalFactor
-* catchMultiplier
 
 desiredVelocity =
-direction * desiredSpeed
+direction
+* MiniConfig.MoveSpeed
+* arrival
+* catchMultiplier
 end
 
 
-local horizontalVelocity =
-horizontal(state.velocity)
-
-local accelerating =
-desiredVelocity.Magnitude
-> horizontalVelocity.Magnitude
-
 local acceleration =
-if accelerating
-then SETTINGS.AccelerationStudsPerSecond2
-else SETTINGS.DecelerationStudsPerSecond2
+if desiredVelocity.Magnitude
+> state.velocity.Magnitude
+then
+SETTINGS.AccelerationStudsPerSecond2
+else
+SETTINGS.DecelerationStudsPerSecond2
 
-horizontalVelocity =
+
+state.velocity =
 moveTowards(
-horizontalVelocity,
+state.velocity,
 desiredVelocity,
 acceleration * dt
 )
 
-state.velocity =
-horizontalVelocity
 
-
--- Prevent a high-speed Mini from overshooting its follow point.
 local travel =
-horizontalVelocity * dt
+state.velocity * dt
 
-if travel.Magnitude > distance and distance > 0 then
-flatPosition =
-flatDesired
+
+if distance > 0
+and travel.Magnitude > distance
+then
+state.position =
+Vector3.new(
+desired.X,
+state.position.Y,
+desired.Z
+)
 
 state.velocity =
 Vector3.zero
+
 else
-flatPosition += travel
+state.position += travel
 end
 
 
--- Ground height is smoothed separately.
 local yAlpha =
 expAlpha(
 SETTINGS.VerticalResponsiveness,
 dt
 )
 
-local newY =
-state.position.Y
-+ (
-desired.Y - state.position.Y
-) * yAlpha
 
 state.position =
 Vector3.new(
-flatPosition.X,
-newY,
-flatPosition.Z
+state.position.X,
+
+state.position.Y
++ (
+desired.Y
+- state.position.Y
 )
+* yAlpha,
 
-
-local speed =
-horizontal(state.velocity).Magnitude
-
-
--- --------------------------------------------------------
--- FACING
--- --------------------------------------------------------
-
-local desiredForward
-
-if speed > 0.5 then
-desiredForward =
-safeUnit(
-state.velocity,
-state.forward
-)
-else
--- At rest Mini looks toward its owner.
-desiredForward =
-safeUnit(
-root.Position - state.position,
-state.forward
+state.position.Z
 )
 end
 
-local turnAlpha =
-expAlpha(
-SETTINGS.TurnResponsiveness,
-dt
+
+-- Same facing direction as the REAL avatar.
+-- No fake wobble, lean, bob or procedural turning.
+local desiredForward =
+safeUnit(
+root.CFrame.LookVector,
+state.forward
 )
+
 
 state.forward =
 safeUnit(
 state.forward:Lerp(
 desiredForward,
-turnAlpha
+
+expAlpha(
+SETTINGS.TurnResponsiveness,
+dt
+)
 ),
+
 state.forward
 )
 
 
--- --------------------------------------------------------
--- GAIT
--- --------------------------------------------------------
-
-animateRun(
-state,
-speed,
-dt
-)
-
-
--- Mini no longer oscillates through the floor.
--- The run bounce only lifts the body UP during a stride.
-local speedRatio =
-math.clamp(
-speed / MiniConfig.MoveSpeed,
-0,
-1.4
-)
-
-local runBob =
-math.abs(
-math.sin(state.gaitPhase)
-)
-* SETTINGS.MoveBobHeight
-* state.gaitBlend
-* math.min(speedRatio, 1)
-
-local idleBob =
-math.sin(
-os.clock() * SETTINGS.IdleBobFrequency
-+ state.phaseOffset
-)
-* SETTINGS.IdleBobHeight
-* (1 - state.gaitBlend)
-
-
-local renderPosition =
-state.position
-+ Vector3.new(
-0,
-runBob + idleBob,
-0
-)
-
-
-local facing =
+local pivot =
 CFrame.lookAt(
-renderPosition,
-renderPosition + state.forward
+state.position,
+state.position + state.forward
 )
 
 
--- Constant FORWARD running lean.
--- The previous version rolled left/right every stride which read as waddling.
-local forwardLean =
--math.rad(
-SETTINGS.LeanDegrees
-)
-* math.clamp(
-speedRatio,
-0,
-1
-)
-* state.gaitBlend
-
-
-model:PivotTo(
-facing
-* CFrame.Angles(
-forwardLean,
-0,
-0
-)
-)
+state.model:PivotTo(pivot)
 end
 
 
@@ -675,9 +671,11 @@ function MiniController.Init()
 minisFolder =
 Workspace:WaitForChild("Minis")
 
+
 for _, child in minisFolder:GetChildren() do
 register(child)
 end
+
 
 minisFolder.ChildAdded:Connect(register)
 minisFolder.ChildRemoved:Connect(unregister)
@@ -685,25 +683,25 @@ end
 
 
 function MiniController.Start()
-RunService:BindToRenderStep(
-"MiniPersonality",
-Enum.RenderPriority.Character.Value + 1,
 
-function(dt)
+-- Roblox Animator has already written the player's pose when
+-- PreSimulation fires, so copy it here.
+RunService.PreSimulation:Connect(function()
 for _, state in states do
-updateMini(state, dt)
+mirrorPose(state)
 end
-end
+end)
+
+
+RunService.PreRender:Connect(function(dt)
+for _, state in states do
+updateRoot(
+state,
+dt
 )
 end
+end)
 
-
-function MiniController.Destroy()
-RunService:UnbindFromRenderStep(
-"MiniPersonality"
-)
-
-table.clear(states)
 end
 
 

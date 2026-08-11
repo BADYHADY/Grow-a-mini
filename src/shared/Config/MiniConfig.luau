@@ -6,19 +6,22 @@ return {
 	-- Chibi proportions. We do NOT uniformly shrink the player's character --
 	-- that produces an unreadable blob for avatars with large accessories or
 	-- Rthro bodies. We build our own R6 rig and map appearance onto it.
-	Scale = {
-		Overall = 0.35,
-		-- Multipliers applied on top of Overall, per body part, to get the
-		-- collectible-figurine silhouette. Head oversized, limbs stubby.
-		Head = 1.55,
-		Torso = 1.0,
-		Arm = 0.75,
-		Leg = 0.7,
-		-- Hands read as "chunky" by widening arms near the wrist only.
-		HandWidthBoost = 1.35,
-	},
+Scale = {
+-- Final Mini size relative to a normal Roblox avatar.
+Overall = 0.35,
 
-	-- Appearance mapping rules. These exist to keep 24 minis cheap and readable.
+-- R15 keeps the real avatar rig so normal Roblox animations can be
+-- mirrored directly. These are subtle collectible-figure adjustments,
+-- not a replacement skeleton.
+R15 = {
+HeadMultiplier = 1.15,
+HeightMultiplier = 0.90,
+WidthMultiplier = 1.05,
+DepthMultiplier = 1.05,
+},
+},
+
+-- Appearance mapping rules. These exist to keep 24 minis cheap and readable.
 	Appearance = {
 		-- Layered clothing is mesh-deformation heavy and does not fit an R6 rig.
 		-- We approximate with the classic shirt/pants textures instead.
