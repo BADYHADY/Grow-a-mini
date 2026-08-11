@@ -21,26 +21,39 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+local MiniConfig = require(Shared.Config.MiniConfig)
+
+-- The dojo is the MINI's home and training gym, not the player's. It is built
+-- at the same scale as the Mini, so the player stands over it like a toy set --
+-- which is the whole "tiny fighter" fantasy. Tying it to the Mini's own scale
+-- means the two can never drift out of proportion with each other.
+local MINI_SCALE = MiniConfig.Scale.Overall
 
 local CONFIG = {
 	-- Bases sit in a grid away from the default spawn, so the world reads as
 	-- "everyone has their own plot" the moment you look around.
 	Origin = Vector3.new(0, 0, 90),
-	SlotSpacing = 56,
-	SlotsPerRow = 4,
+	SlotSpacing = 30,
+	SlotsPerRow = 5,
 	MaxSlots = 20,
 
-	PlotSize = Vector3.new(26, 1, 26),
+	-- The plot carries a full-size player walking around a Mini-size dojo, so
+	-- it is sized for the player even though everything on it is not.
+	PlotSize = Vector3.new(14, 1, 14),
 	PlotColor = Color3.fromRGB(58, 62, 72),
 	TrimColor = Color3.fromRGB(196, 148, 100),
 
-	-- The dojo model is open on its -Z face, so everything the player should
-	-- see is arranged along that axis: they stand at negative Z looking in.
-	BagOffsetZ = 4.0,
-	TrainingOffsetZ = 1.4,
-	PlayerSpawnOffsetZ = -11.0,
-	SignOffsetZ = -8.0,
-	SignClearance = 1.8,
+	-- The dojo model is open on its -Z face, so everything the Mini should be
+	-- seen doing is arranged along that axis. These offsets are authored
+	-- against the full-size model and shrink with it.
+	BagOffsetZ = 4.0 * MINI_SCALE,
+	TrainingOffsetZ = 1.4 * MINI_SCALE,
+	SignOffsetZ = -8.0 * MINI_SCALE,
+
+	-- The player is NOT scaled, so their standing spot and the sign height are
+	-- in player units.
+	PlayerSpawnOffsetZ = -5.0,
+	SignClearance = 2.4,
 }
 
 local MiniBaseService = {}
@@ -377,11 +390,21 @@ function MiniBaseService.Init(registry)
 	-- why the world looks empty.
 	assert(assets, "ServerStorage.Assets is missing — the Dojo and Punchingbag models must live there")
 
-	dojoTemplate = assets:FindFirstChild("Dojo")
-	bagTemplate = assets:FindFirstChild("Punchingbag")
-	assert(dojoTemplate, "ServerStorage.Assets.Dojo is missing")
-	assert(bagTemplate, "ServerStorage.Assets.Punchingbag is missing")
+	local dojoSource = assets:FindFirstChild("Dojo")
+	local bagSource = assets:FindFirstChild("Punchingbag")
+	assert(dojoSource, "ServerStorage.Assets.Dojo is missing")
+	assert(bagSource, "ServerStorage.Assets.Punchingbag is missing")
 
+	-- Shrink working copies rather than the stored assets, so the originals stay
+	-- at authored scale and remain editable in Studio.
+	dojoTemplate = dojoSource:Clone()
+	dojoTemplate:ScaleTo(MINI_SCALE)
+
+	bagTemplate = bagSource:Clone()
+	bagTemplate:ScaleTo(MINI_SCALE)
+
+	-- Measured AFTER scaling, so every downstream placement is already in
+	-- Mini units and no call site has to remember to convert.
 	measureTemplates()
 
 	if GameConfig.DebugLogging then
