@@ -25,11 +25,16 @@ return {
 		AllowLayeredClothing = false,
 		-- Hats and hair carry most of the identity; anything past two becomes
 		-- visual noise at 0.35 scale.
-		MaxAccessories = 2,
+		MaxAccessories = 3,
 		-- Reject accessories whose bounding box exceeds this on any axis (studs,
 		-- measured at full avatar scale). Catches the joke-sized items that would
 		-- otherwise be larger than the whole Mini.
 		MaxAccessoryStuds = 4.0,
+
+-- Head accessories carry identity far more strongly than back/shoulder
+-- accessories. Hair, hats and face pieces get a larger allowance before
+-- being classified as joke-sized.
+MaxHeadAccessoryStuds = 8.0,
 		-- Accessory types kept, in priority order, when trimming to MaxAccessories.
 		AccessoryPriority = {
 			Enum.AccessoryType.Hair,

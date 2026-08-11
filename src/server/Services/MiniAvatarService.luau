@@ -46,55 +46,124 @@ local function accessoryRank(accessoryType: Enum.AccessoryType): number
 	return #APPEARANCE.AccessoryPriority + 1
 end
 
--- Filters the accessory list on the description itself, before the model is
--- built. Cheaper than building everything and deleting half of it, and it keeps
--- layered clothing from ever reaching the mesh-deformation path.
+-- Only these accessory categories are actual body clothing for our purposes.
+-- Hair/Hat/Face can ALSO be layered Roblox accessories and are critical identity
+-- carriers, so they must survive even while layered body clothing is disabled.
+local function isLayeredBodyClothing(accessoryType: Enum.AccessoryType): boolean
+return accessoryType == Enum.AccessoryType.TShirt
+or accessoryType == Enum.AccessoryType.Shirt
+or accessoryType == Enum.AccessoryType.Pants
+or accessoryType == Enum.AccessoryType.Jacket
+or accessoryType == Enum.AccessoryType.Sweater
+or accessoryType == Enum.AccessoryType.Shorts
+or accessoryType == Enum.AccessoryType.LeftShoe
+or accessoryType == Enum.AccessoryType.RightShoe
+or accessoryType == Enum.AccessoryType.DressSkirt
+end
+
+-- Filters the accessory list before Roblox builds the rig.
+--
+-- Important product rule:
+-- identity accessories beat implementation convenience.
+-- Hair, hats and face accessories stay even when they are layered.
 local function trimAccessories(description: HumanoidDescription)
-	local accessories = description:GetAccessories(true)
+local accessories = description:GetAccessories(true)
 
-	local kept = {}
-	for _, accessory in accessories do
-		if accessory.IsLayered and not APPEARANCE.AllowLayeredClothing then
-			continue
-		end
-		table.insert(kept, accessory)
-	end
+local kept = {}
+local droppedLayeredBodyClothing = 0
 
-	table.sort(kept, function(a, b)
-		return accessoryRank(a.AccessoryType) < accessoryRank(b.AccessoryType)
-	end)
+for _, accessory in accessories do
+local unsupportedBodyClothing =
+accessory.IsLayered
+and not APPEARANCE.AllowLayeredClothing
+and isLayeredBodyClothing(accessory.AccessoryType)
 
-	while #kept > APPEARANCE.MaxAccessories do
-		table.remove(kept)
-	end
+if unsupportedBodyClothing then
+droppedLayeredBodyClothing += 1
+continue
+end
 
-	description:SetAccessories(kept, true)
+table.insert(kept, accessory)
+end
+
+table.sort(kept, function(a, b)
+return accessoryRank(a.AccessoryType) < accessoryRank(b.AccessoryType)
+end)
+
+while #kept > APPEARANCE.MaxAccessories do
+table.remove(kept)
+end
+
+if GameConfig.DebugLogging then
+print(
+`[MiniAvatarService] appearance filter: input={#accessories}, kept={#kept}, droppedBodyClothing={droppedLayeredBodyClothing}`
+)
+end
+
+description:SetAccessories(kept, true)
 end
 
 -- Joke-sized accessories can only be caught after the model exists, since the
 -- description carries an asset id and nothing about its dimensions. Measured
 -- before scaling, so the threshold is in normal-avatar studs.
+local function accessorySizeLimit(accessory: Accessory): number
+local handle = accessory:FindFirstChild("Handle")
+
+if not handle or not handle:IsA("BasePart") then
+return APPEARANCE.MaxAccessoryStuds
+end
+
+local weld = handle:FindFirstChildOfClass("Weld")
+
+if not weld then
+return APPEARANCE.MaxAccessoryStuds
+end
+
+local bodyPart =
+if weld.Part0 == handle
+then weld.Part1
+else weld.Part0
+
+-- Hair, hats and face accessories attach to the head. They are one of the
+-- strongest ways a player recognises "that's me", so allow them more room.
+if bodyPart and bodyPart.Name == "Head" then
+return APPEARANCE.MaxHeadAccessoryStuds
+end
+
+return APPEARANCE.MaxAccessoryStuds
+end
+
 local function removeOversizedAccessories(model: Model): number
-	local removed = 0
+local removed = 0
 
-	for _, descendant in model:GetDescendants() do
-		if not descendant:IsA("Accessory") then
-			continue
-		end
+for _, descendant in model:GetDescendants() do
+if not descendant:IsA("Accessory") then
+continue
+end
 
-		local handle = descendant:FindFirstChild("Handle")
-		if not handle or not handle:IsA("BasePart") then
-			continue
-		end
+local handle = descendant:FindFirstChild("Handle")
 
-		local size = handle.Size
-		if math.max(size.X, size.Y, size.Z) > APPEARANCE.MaxAccessoryStuds then
-			descendant:Destroy()
-			removed += 1
-		end
-	end
+if not handle or not handle:IsA("BasePart") then
+continue
+end
 
-	return removed
+local size = handle.Size
+local largestAxis = math.max(size.X, size.Y, size.Z)
+local limit = accessorySizeLimit(descendant)
+
+if largestAxis > limit then
+if GameConfig.DebugLogging then
+print(
+`[MiniAvatarService] dropping oversized accessory "{descendant.Name}" type={tostring(descendant.AccessoryType)} size={string.format("%.2f", largestAxis)} limit={limit}`
+)
+end
+
+descendant:Destroy()
+removed += 1
+end
+end
+
+return removed
 end
 
 --[[ Rig setup ]]
