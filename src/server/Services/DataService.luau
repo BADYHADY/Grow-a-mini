@@ -71,7 +71,13 @@ local TEMPLATE = {
 --
 -- Example for the next bump:
 --   [2] = function(data) data.Cosmetics = { OwnedAuras = {} } end,
-local MIGRATIONS: { [number]: (data: any) -> () } = {}
+local MIGRATIONS: { [number]: (data: any) -> () } = {
+-- Baseline migration for profiles created before SchemaVersion existed.
+-- Reconcile runs AFTER migrations and fills the normal V1 defaults.
+[1] = function(_data: any)
+-- No structural transform required for the V1 baseline.
+end,
+}
 
 local DataService = {}
 
@@ -84,23 +90,37 @@ local store
 local profiles: { [Player]: any } = {}
 
 local function migrate(player: Player, data: any)
-	local from = data.SchemaVersion or 1
+local rawVersion = data.SchemaVersion
 
-	while data.SchemaVersion < CURRENT_SCHEMA_VERSION do
-		local target = data.SchemaVersion + 1
-		local migration = MIGRATIONS[target]
+local from = 0
+if type(rawVersion) == "number" then
+from = math.max(0, math.floor(rawVersion))
+end
 
-		-- Refusing to load is the right failure here. Guessing at a missing
-		-- migration is how save files get silently mangled.
-		assert(migration, `No migration to schema v{target} (player {player.UserId})`)
+assert(
+from <= CURRENT_SCHEMA_VERSION,
+`Profile schema v{from} is newer than server schema v{CURRENT_SCHEMA_VERSION} (player {player.UserId})`
+)
 
-		migration(data)
-		data.SchemaVersion = target
-	end
+local version = from
 
-	if from ~= data.SchemaVersion and GameConfig.DebugLogging then
-		print(`[DataService] migrated {player.Name}: v{from} -> v{data.SchemaVersion}`)
-	end
+while version < CURRENT_SCHEMA_VERSION do
+local target = version + 1
+local migration = MIGRATIONS[target]
+
+assert(
+migration,
+`No migration to schema v{target} (player {player.UserId})`
+)
+
+migration(data)
+data.SchemaVersion = target
+version = target
+end
+
+if from ~= version and GameConfig.DebugLogging then
+print(`[DataService] migrated {player.Name}: v{from} -> v{version}`)
+end
 end
 
 local function onPlayerAdded(player: Player)
@@ -116,9 +136,22 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 
-	profile:AddUserId(player.UserId) -- GDPR association
-	profile:Reconcile() -- fill in fields added to TEMPLATE since their last save
-	migrate(player, profile.Data)
+profile:AddUserId(player.UserId) -- GDPR association
+
+-- Migrate BEFORE Reconcile. If Reconcile wrote the newest SchemaVersion
+-- into an old profile first, we would lose the information required to
+-- know which migrations that profile still needs.
+local prepared, prepareErr = pcall(function()
+migrate(player, profile.Data)
+profile:Reconcile()
+end)
+
+if not prepared then
+warn(`[DataService] failed to prepare profile for {player.UserId}: {prepareErr}`)
+profile:EndSession()
+player:Kick("Your save could not be updated safely. Please rejoin.")
+return
+end
 
 	profile.OnSessionEnd:Connect(function()
 		-- Only a *surprise* session end warrants a kick. A normal leave clears
