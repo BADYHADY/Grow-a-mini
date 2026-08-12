@@ -335,6 +335,35 @@ local function refreshBagPrompt(player: Player, base: Model)
 	prompt.ObjectText = `PUNCHING BAG LV.{level + 1}`
 	prompt.ActionText = if cost then `UPGRADE  ${cost}` else "MAXED"
 	prompt.Enabled = cost ~= nil
+
+	-- The same thing again, but written in the world above the bag rather than
+	-- only appearing when you are close enough to press it. This is how the
+	-- reference game labels every machine on its farm, and it is what lets a
+	-- player read what a station is -- and how far a NEIGHBOUR has taken theirs
+	-- -- without walking up to it.
+	local signAnchor = base:FindFirstChild("PUNCHING BAGSignAnchor")
+	local sign = signAnchor and signAnchor:FindFirstChild("PUNCHING BAGSign")
+
+	if not sign then
+		return
+	end
+
+	local title = sign:FindFirstChild("Title")
+	local detail = sign:FindFirstChild("Detail")
+
+	if title then
+		title.Text = `PUNCHING BAG  <font color="#8FD3FF">NV.{level + 1}</font>`
+	end
+
+	if detail then
+		-- What this level is WORTH, then what the next one costs. A number the
+		-- player can watch go up, next to the price of making it go up faster.
+		local multiplier = 1 + UpgradeConfig.getBonus("PunchingBag", level)
+
+		detail.Text = if cost
+			then `x{string.format("%.2f", multiplier)}  ·  <font color="#7EF07E">${cost}</font>`
+			else `x{string.format("%.2f", multiplier)}  ·  MAXED`
+	end
 end
 
 local function bindBagPrompt(player: Player, base: Model)

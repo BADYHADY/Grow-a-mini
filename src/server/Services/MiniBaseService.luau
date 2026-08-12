@@ -394,6 +394,65 @@ end
 -- The post the player walks up to and presses. TowerService fills in the text
 -- and does the work; the base only owns the furniture. Stands outside whatever
 -- the Mini fights in, so it is reachable with either arena or fallback pit.
+-- The label over a station: what it is, what level it is, and what it is
+-- currently doing. The reference game writes this over every machine on the
+-- farm -- FEEDER NV.6, 6/S, 48/360 -- and it is why that game needs almost no
+-- screen UI: you learn what a thing is and how far you have taken it by looking
+-- at the thing itself.
+--
+-- Returns the sign so the service that OWNS the station can fill in its numbers.
+local function buildStationSign(
+	base: Model,
+	name: string,
+	position: Vector3,
+	width: number
+): BillboardGui
+	local anchorPart = makePart(
+		`{name}SignAnchor`,
+		Vector3.new(0.4, 0.4, 0.4),
+		Color3.fromRGB(30, 32, 38),
+		CFrame.new(position),
+		base
+	)
+	anchorPart.Transparency = 1
+	anchorPart.CanCollide = false
+	anchorPart.CanQuery = false
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = `{name}Sign`
+	billboard.Size = UDim2.fromScale(width, width * 0.34)
+	billboard.AlwaysOnTop = false
+	-- Readable from your own plot and from the neighbour's, gone by the time it
+	-- would be a wall of text across a busy server.
+	billboard.MaxDistance = 150
+	billboard.Parent = anchorPart
+
+	local function line(labelName: string, y: number, height: number, colour: Color3, stroke: number)
+		local text = Instance.new("TextLabel")
+		text.Name = labelName
+		text.Position = UDim2.fromScale(0, y)
+		text.Size = UDim2.fromScale(1, height)
+		text.BackgroundTransparency = 1
+		text.Font = Enum.Font.GothamBlack
+		text.TextScaled = true
+		text.RichText = true
+		text.TextColor3 = colour
+		text.Parent = billboard
+
+		local outline = Instance.new("UIStroke")
+		outline.Thickness = stroke
+		outline.Color = Color3.fromRGB(24, 20, 32)
+		outline.Parent = text
+
+		return text
+	end
+
+	line("Title", 0, 0.55, Color3.fromRGB(255, 206, 92), 3).Text = name
+	line("Detail", 0.55, 0.45, Color3.fromRGB(255, 255, 255), 2.5).Text = ""
+
+	return billboard
+end
+
 -- The big label over the fighting pit: FLOOR 12, the owner's name, and what
 -- the floor pays. Everything the reference game tells you about a pit is
 -- written in the world above it in huge outlined type, not tucked into a corner
@@ -632,6 +691,21 @@ local function buildBase(player: Player, slot: number): Model
 		dojo:GetPivot().Position.Z - CONFIG.BagOffsetZ
 	))
 	bag.Parent = base
+
+	do
+		local bagBox, bagSize = bag:GetBoundingBox()
+
+		buildStationSign(
+			base,
+			"PUNCHING BAG",
+			Vector3.new(
+				bagBox.Position.X,
+				bagBox.Position.Y + bagSize.Y * 0.5 + 0.9,
+				bagBox.Position.Z
+			),
+			5.5
+		)
+	end
 
 	-- How much room the Mini has to roam when it has nothing to do: the WHOLE
 	-- dojo platform, not the little mat inside the dojo model. Published on the
