@@ -573,56 +573,18 @@ local function buildBagPost(base: Model, dojoSpace: BasePart, dojo: Model)
 	prompt.Parent = post
 end
 
-local function buildSign(player: Player, base: Model, dojoSpace: BasePart)
-	local anchor = makePart(
-		"SignAnchor",
-		Vector3.new(0.6, 0.6, 0.6),
-		Color3.fromRGB(30, 32, 38),
-		CFrame.new(
-			dojoSpace.Position.X,
-			surfaceY(dojoSpace) + metrics.dojoHeight + CONFIG.SignClearance,
-			dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 - 1.0
-		),
-		base
-	)
-	anchor.Transparency = 1
-	anchor.CanCollide = false
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "BaseSign"
-	-- Wide enough that a long username shrinks rather than wrapping onto two
-	-- lines, which reads as broken rather than as a sign.
-	billboard.Size = UDim2.fromScale(18, 4)
-	billboard.AlwaysOnTop = false
-	-- Readable across the plot but not from the far side of the map, so a busy
-	-- server does not turn into a wall of floating text.
-	billboard.MaxDistance = 160
-	billboard.Parent = anchor
-
-	local title = Instance.new("TextLabel")
-	title.Name = "Title"
-	title.Size = UDim2.fromScale(1, 0.6)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBlack
-	title.TextScaled = true
-	title.TextWrapped = false
-	title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	title.TextStrokeTransparency = 0.3
-	title.Text = string.upper(player.Name) .. "'S MINI BASE"
-	title.Parent = billboard
-
-	local subtitle = Instance.new("TextLabel")
-	subtitle.Name = "Subtitle"
-	subtitle.Position = UDim2.fromScale(0, 0.6)
-	subtitle.Size = UDim2.fromScale(1, 0.4)
-	subtitle.BackgroundTransparency = 1
-	subtitle.Font = Enum.Font.GothamBold
-	subtitle.TextScaled = true
-	subtitle.TextColor3 = Color3.fromRGB(255, 206, 92)
-	subtitle.TextStrokeTransparency = 0.35
-	subtitle.Text = "TRAINER LV.1"
-	subtitle.Parent = billboard
-end
+-- There used to be a floating "<NAME>'S MINI BASE / TRAINER LV.1" sign over the
+-- dojo. It is gone on purpose.
+--
+-- Seen in a recording of the game, it landed in exactly the same patch of screen
+-- as the punching bag's station sign and the Mini's own stat plate: three pieces
+-- of floating text stacked into an unreadable pile the moment you stood where
+-- the player actually stands. It also said nothing the station signs do not --
+-- whose base it is is obvious from standing on it, and the level is on the bag.
+--
+-- The reference game has no floating sign like this either. It puts the player's
+-- name on a physical wooden board off to one side, which is a thing to build
+-- later rather than a label to hang in the air.
 
 local function buildBase(player: Player, slot: number): Model
 	local origin = slotCFrame(slot)
@@ -739,7 +701,6 @@ local function buildBase(player: Player, slot: number): Model
 
 	buildTowerPost(base, dojoSpace, bridge, plate)
 	buildBagPost(base, dojoSpace, dojo)
-	buildSign(player, base, dojoSpace)
 
 	return base
 end

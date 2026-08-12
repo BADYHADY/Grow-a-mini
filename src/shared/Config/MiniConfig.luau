@@ -166,10 +166,14 @@ FullPersonalityDistanceStuds = 80,
 	-- land as a jump in the bar rather than as a bar that suddenly got longer.
 	HealthBoostPerLevel = 60,
 
-	-- A brand new Mini wakes up weak. Without this the very first thing the
-	-- player sees is a full bar with nothing to earn, and the entire point of
-	-- the punching bag is invisible until combat exists to drain it.
-	StartingHealthFraction = 0.12,
+	-- A brand new Mini wakes up READY. The loop starts at the Colyseum, not at
+	-- the bag: you spawn, you see a fighter that can already fight, you send it,
+	-- it comes home beaten, and THAT is when the punching bag means something.
+	--
+	-- It used to start at 12% -- nearly dead -- so the first thing a new player
+	-- had to do was stand and watch it train with nothing at stake, and the
+	-- SEND TO TOWER button was a lie for the first minute of the game.
+	StartingHealthFraction = 1.0,
 
 	-- The Mini walks to the dojo before it can throw anything. Server and client
 	-- both offset the punch clock by this, so the count above its head and the
