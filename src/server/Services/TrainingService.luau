@@ -38,6 +38,10 @@ type Session = {
 	epoch: number,
 	paidPunches: number,
 	publishedTo: Model?,
+	-- How many punches this bag survives. Sized once per session against how
+	-- much health the Mini has to put back, so the bag gives out at about the
+	-- same time the Mini does -- see MiniConfig.Training.Wear.
+	durability: number,
 }
 
 local sessions: { [Player]: Session } = {}
@@ -139,6 +143,35 @@ local function applyLevels(player: Player, stats): number
 	return gained
 end
 
+--[[ Bag wear ]]
+
+-- The bag's remaining condition, 0..1, published on the bag model so every
+-- client can draw it. The server owns it for the same reason it owns everything
+-- else: it is the visible face of a payout the client must not be able to fake.
+local function publishCondition(player: Player, condition: number)
+	local bag = MiniBaseService.getBagModel(player)
+
+	if bag then
+		bag:SetAttribute("Condition", math.clamp(condition, 0, 1))
+	end
+end
+
+-- How many punches it takes to put this Mini back to full, at the value one
+-- punch currently has. This is what the bag is sized against.
+local function durabilityFor(data): number
+	local stats = data.Mini
+	local perPunch = math.max(
+		1,
+		math.floor(TRAINING.HealthPerPunch * bagMultiplier(data))
+	)
+	local needed = math.max(0, stats.MaxHealth - stats.Health) / perPunch
+
+	return math.max(
+		TRAINING.Wear.MinDurabilityPunches,
+		math.ceil(needed * TRAINING.Wear.DurabilityMargin)
+	)
+end
+
 local function award(player: Player, data, punches: number)
 	local stats = data.Mini
 	local multiplier = bagMultiplier(data)
@@ -178,15 +211,44 @@ local function step(player: Player)
 	end
 
 	if not epoch or not rate then
-		-- Not training. Still republish if the Mini was rebuilt, or the stats
-		-- above a following Mini would read as zero.
+		-- Not training. The bag is left alone, so it repairs itself: a Mini out
+		-- at the tower is away for far longer than a repair takes, and a bag the
+		-- player has to wait on would be a wall in the middle of the loop.
+		if session then
+			sessions[player] = nil
+			publishCondition(player, 1)
+		end
+
+		-- Still republish if the Mini was rebuilt, or the stats above a
+		-- following Mini would read as zero.
+		republishIfStale()
+		return
+	end
+
+	-- ANTI-FARM. Training is the reward for having SPENT health in a fight; a
+	-- Mini that is already full earns nothing, however many times the player
+	-- toggles FOLLOW ME / GO TRAIN. Enforced here rather than in the UI,
+	-- because the UI is the client's and the client is assumed hostile.
+	if data.Mini.Health >= data.Mini.MaxHealth then
+		if session then
+			sessions[player] = nil
+			publishCondition(player, 1)
+		end
+
+		MiniService.enterReady(player)
 		republishIfStale()
 		return
 	end
 
 	if not session or session.epoch ~= epoch then
-		session = { epoch = epoch, paidPunches = 0, publishedTo = nil }
+		session = {
+			epoch = epoch,
+			paidPunches = 0,
+			publishedTo = nil,
+			durability = durabilityFor(data),
+		}
 		sessions[player] = session
+		publishCondition(player, 1)
 	end
 
 	local landed = PunchClock.landed(epoch, rate)
@@ -199,7 +261,19 @@ local function step(player: Player)
 
 	session.paidPunches = landed
 	award(player, data, unpaid)
+
+	-- A level gained mid-cycle raises the health ceiling, so the Mini now needs
+	-- more punches than the bag was sized for. Extend it rather than let the bag
+	-- give out while the fighter still has a bar to fill.
+	session.durability = math.max(
+		session.durability,
+		session.paidPunches + durabilityFor(data)
+	)
 	TrainingService.publish(player, mini)
+
+	-- Every punch visibly costs the bag something. This is the whole point of
+	-- the feeder: the resource is spent on screen, not in a stock counter.
+	publishCondition(player, 1 - landed / session.durability)
 
 	-- Full. Down tools and go and stand about -- that is the cue for the player
 	-- to send it back to the tower.

@@ -71,6 +71,13 @@ bagRestPivot: CFrame?,
 bagAnchor: Vector3?,
 bagAngle: number,
 bagAngularVelocity: number,
+-- Wear, 0 = pristine, 1 = collapsed. Smoothed locally toward the server's
+-- Condition attribute so the bag sags as it is hit and straightens back up
+-- over a few seconds once the Mini walks away.
+bagWear: number,
+bagTintStep: number,
+bagPartColors: { [BasePart]: Color3 }?,
+bagLeanAxis: Vector3?,
 }
 
 
@@ -414,6 +421,19 @@ local boxCFrame, boxSize = body:GetBoundingBox()
 state.bagModel = body
 state.bagRestPivot = body:GetPivot()
 
+-- Remembered before anything tints them, so a repaired bag goes back to the
+-- colour the artist gave it rather than to a guess.
+local colors: { [BasePart]: Color3 } = {}
+
+for _, descendant in body:GetDescendants() do
+if descendant:IsA("BasePart") then
+colors[descendant] = descendant.Color
+end
+end
+
+state.bagPartColors = colors
+state.bagTintStep = 0
+
 -- The impact sound belongs to the bag, not the listener: parenting it to the
 -- part makes it positional for free, so you only hear a Mini training when you
 -- are standing at that plot.
@@ -470,6 +490,40 @@ return
 end
 
 
+-- Wear is the server's number; the client only smooths it. Damage lands
+-- fast so a punch reads as having cost something, and repairs slowly so a
+-- bag that gave out stays visibly broken long enough to be the signal that
+-- the Mini is done.
+local WEAR = TRAINING.Wear
+local parent = model.Parent
+local condition = parent and parent:GetAttribute("Condition")
+local known = if type(condition) == "number" then condition else 1
+local targetWear = 1 - math.clamp(known, 0, 1)
+local wearRate = if targetWear > state.bagWear then 9 else 1 / WEAR.RepairSeconds
+
+state.bagWear += (targetWear - state.bagWear)
+* math.min(1, dt * wearRate)
+
+if state.bagWear < 0.002 then
+state.bagWear = 0
+end
+
+-- Colour is only rewritten when the wear crosses a step. Writing Color on
+-- every bag part every frame costs real time and looks identical.
+local tintStep = math.floor(state.bagWear * WEAR.TintSteps + 0.5)
+
+if tintStep ~= state.bagTintStep and state.bagPartColors then
+state.bagTintStep = tintStep
+
+local blend = tintStep / WEAR.TintSteps
+
+for part, original in state.bagPartColors do
+if part.Parent then
+part.Color = original:Lerp(WEAR.WornTint, blend)
+end
+end
+end
+
 -- Damped spring, in radians about the mount. Cheap, and it settles instead
 -- of stopping dead like a tween would.
 local acceleration =
@@ -485,31 +539,47 @@ TRAINING.MaxBagSwingRadians
 )
 
 
-if math.abs(state.bagAngle) < TRAINING.BagRestEpsilon
+local settled = math.abs(state.bagAngle) < TRAINING.BagRestEpsilon
 and math.abs(state.bagAngularVelocity) < TRAINING.BagRestEpsilon
-then
-if state.bagAngle ~= 0 then
+
+if settled then
 state.bagAngle = 0
 state.bagAngularVelocity = 0
+
+-- Nothing swinging and nothing worn: leave the model alone entirely.
+if state.bagWear == 0 then
+if state.bagLeanAxis then
+state.bagLeanAxis = nil
 model:PivotTo(rest)
 end
 
 return
 end
-
-
--- Tip the bag AWAY from the Mini: rotate about the horizontal axis that
--- sends the hanging end along the punch direction.
-local axis = state.forward:Cross(Vector3.yAxis)
-
-if axis.Magnitude < 0.001 then
-return
 end
 
 
+-- Tip the bag AWAY from the Mini: rotate about the horizontal axis that
+-- sends the hanging end along the punch direction. A worn bag keeps leaning
+-- that way and sags off its mount once the swing has died down, so it hangs
+-- broken in the direction it was being beaten.
+local axis = state.forward:Cross(Vector3.yAxis)
+
+if axis.Magnitude >= 0.001 then
+state.bagLeanAxis = axis.Unit
+end
+
+local lean = state.bagLeanAxis
+
+if not lean then
+return
+end
+
+local angle = state.bagAngle + state.bagWear * WEAR.MaxLeanRadians
+local sag = Vector3.new(0, -state.bagWear * WEAR.MaxSagStuds, 0)
+
 model:PivotTo(
-CFrame.new(anchor)
-* CFrame.fromAxisAngle(axis.Unit, state.bagAngle)
+CFrame.new(anchor + sag)
+* CFrame.fromAxisAngle(lean, angle)
 * CFrame.new(-anchor)
 * rest
 )
@@ -959,6 +1029,10 @@ walkPlaying = false,
 
 punchSound = nil,
 bagModel = nil,
+bagWear = 0,
+bagTintStep = 0,
+bagPartColors = nil,
+bagLeanAxis = nil,
 bagRestPivot = nil,
 bagAnchor = nil,
 bagAngle = 0,

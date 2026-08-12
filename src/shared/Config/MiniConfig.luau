@@ -186,6 +186,36 @@ FullPersonalityDistanceStuds = 80,
 	-- reads as a person hitting something.
 	PunchSoundPitchJitter = 0.12,
 
+	-- The bag is the feeder: the player has to SEE the resource being spent.
+	-- Durability is not a fixed stock -- it is sized, at the start of every
+	-- training session, against how many punches this Mini needs to fill up.
+	-- The bag therefore falls apart at roughly the moment the Mini tops out,
+	-- which makes the collapsing bag the readiness signal instead of a number.
+	-- Deliberately NOT a hard stop: a bag can never run out before the Mini is
+	-- healthy, so the player never waits on it.
+	Wear = {
+	-- Slack on top of the punches needed to reach full health, so rounding and
+	-- a level-up mid-cycle can never break the bag early.
+	DurabilityMargin = 1.2,
+	-- Floor, for a Mini that only needs two hits: the wear still has to read.
+	MinDurabilityPunches = 8,
+	-- How long a bag takes to go from collapsed back to pristine once the Mini
+	-- stops working it. A tower run is longer than this, so a returning Mini
+	-- always finds a fresh bag.
+	RepairSeconds = 6,
+
+	-- Presentation. How far a dead bag leans and sags off its mount.
+	MaxLeanRadians = 0.55,
+	MaxSagStuds = 0.22,
+	-- Worn bags darken and desaturate rather than changing hue, which reads as
+	-- damage on any bag texture.
+	WornTint = Color3.fromRGB(96, 74, 58),
+	-- Colour is only rewritten when the wear crosses one of these steps; a
+	-- per-frame property write on every bag part is pure cost for no visible
+	-- difference.
+	TintSteps = 12,
+	},
+
 	-- Bag reaction, as a damped spring in radians about its top mount.
 	BagImpulseRadiansPerSecond = 2.2,
 	BagSwingStiffness = 46,
