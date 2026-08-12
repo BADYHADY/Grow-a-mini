@@ -31,49 +31,50 @@ local MINI_SCALE = MiniConfig.Scale.Overall
 
 local CONFIG = {
 	-- Bases sit in a grid away from the default spawn, so the world reads as
-	-- "everyone has their own plot" the moment you look around.
+	-- "everyone has their own place" the moment you look around. Each player
+	-- gets their OWN dojo and their OWN Colyseum -- but they all stand in the
+	-- same world, because half the point is watching what everybody else's Mini
+	-- is turning into.
 	Origin = Vector3.new(0, 0, 90),
-	SlotSpacing = 30,
+	-- Wide enough to clear the 57-stud arena plate with a gap to walk down, and
+	-- deep enough to clear the whole dojo-bridge-arena run.
+	SlotSpacing = 72,
+	RowSpacing = 130,
 	SlotsPerRow = 5,
 	MaxSlots = 20,
 
-	-- The plot carries a full-size player walking around a Mini-size dojo AND a
-	-- Mini-size arena, so it is sized for the player even though everything
-	-- standing on it is not. Wide rather than deep: the two halves of the loop
-	-- sit side by side, both visible from where the player spawns.
-	PlotSize = Vector3.new(26, 1, 14),
+	-- The plot itself is the authored map in ServerStorage.Assets.BaseMap:
+	-- DojoSpace, Bridge, ArenaPlate, laid out along +Z. Nothing about its shape
+	-- is hardcoded here -- everything below is measured off the clone, so the
+	-- map can be re-edited in Studio without touching this file.
 
-	-- Dojo on the left, Colyseum on the right. The Mini's whole life is a walk
-	-- between these two points. The offsets keep the dojo's 16-stud footprint
-	-- and the arena's from touching.
-	DojoOffsetX = -5.5,
-	PitOffsetX = 7.5,
-	-- How wide the arena is built, across its outer wall. The model is authored
-	-- at 45 studs -- a real stadium -- and is scaled down to this, because the
-	-- fighters standing in it are two studs tall.
-	ArenaFootprintStuds = 10.0,
+	-- How wide the Colyseum is built, across its outer wall, as a FRACTION of
+	-- the arena plate it stands on. The model is authored as a full-size
+	-- stadium; what matters is that it sits comfortably on its plate.
+	ArenaPlateFraction = 0.82,
 	-- Fallback only, for a place whose Arena asset is missing: the old bare ring
 	-- kept the loop playable rather than leaving the Mini nowhere to fight.
 	PitRadius = 2.4,
-	PlotColor = Color3.fromRGB(58, 62, 72),
-	TrimColor = Color3.fromRGB(196, 148, 100),
+
+	-- How far apart the two fighters square up, in MINI lengths. Deliberately
+	-- NOT derived from the arena's size: the arena got twenty times bigger and
+	-- the fighters did not, and a gap scaled off the building would leave them
+	-- swinging at each other from across the sand.
+	FightGapStuds = 1.1,
+
 
 	-- The dojo model is open on its -Z face, so everything the Mini should be
 	-- seen doing is arranged along that axis. These offsets are authored
 	-- against the full-size model and shrink with it.
 	BagOffsetZ = 4.0 * MINI_SCALE,
-	TrainingOffsetZ = 1.4 * MINI_SCALE,
 	-- How far in front of the BAG BODY the Mini stands to punch it. Measured
 	-- against the bag itself rather than the stand, because the bag hangs off
 	-- one side of its frame and a Mini aimed at the frame punches thin air.
 	-- Tuned by measuring the Mini's actual reach at full extension against the
 	-- bag's radius in-game: close enough that the fist presses into the bag.
 	StandOffFromBagZ = 1.70 * MINI_SCALE,
-	SignOffsetZ = -8.0 * MINI_SCALE,
 
-	-- The player is NOT scaled, so their standing spot and the sign height are
-	-- in player units.
-	PlayerSpawnOffsetZ = -5.0,
+	-- The player is NOT scaled, so the sign height is in player units.
 	SignClearance = 2.4,
 }
 
@@ -89,6 +90,10 @@ local AnalyticsService
 local basesFolder: Folder
 local dojoTemplate: Model
 local bagTemplate: Model
+-- The authored level: DojoSpace, Bridge, ArenaPlate. Laid out in Studio, cloned
+-- once per player, and never reasoned about by hardcoded offsets -- every
+-- placement below measures the clone instead.
+local mapTemplate: Model
 -- Optional: a place without it falls back to the bare pit, so a missing art
 -- asset degrades the look rather than breaking the loop.
 local arenaTemplate: Model?
@@ -98,6 +103,7 @@ local metrics = {
 	dojoPivotToBottom = 0,
 	dojoFloorTopFromPivot = 0,
 	dojoHeight = 0,
+	dojoFootprint = 0,
 	bagPivotToBottom = 0,
 }
 
@@ -131,7 +137,20 @@ local function slotCFrame(slot: number): CFrame
 	-- crammed against one edge of the world.
 	local xOffset = (column - (CONFIG.SlotsPerRow - 1) / 2) * CONFIG.SlotSpacing
 
-	return CFrame.new(CONFIG.Origin + Vector3.new(xOffset, 0, row * CONFIG.SlotSpacing))
+	return CFrame.new(CONFIG.Origin + Vector3.new(xOffset, 0, row * CONFIG.RowSpacing))
+end
+
+-- The authored map runs dojo -> bridge -> arena along +Z. Everything that needs
+-- to know where something is asks these rather than doing arithmetic on offsets,
+-- so the map can be moved around in Studio and the game follows it.
+local function mapPart(base: Model, name: string): BasePart?
+	local part = base:FindFirstChild(name)
+	return part and part:IsA("BasePart") and part or nil
+end
+
+-- Y of the surface a given platform's contents stand on.
+local function surfaceY(part: BasePart): number
+	return part.Position.Y + part.Size.Y * 0.5
 end
 
 --[[ Template measurement ]]
@@ -147,6 +166,7 @@ local function measureTemplates()
 
 	local _, dojoSize = dojoTemplate:GetBoundingBox()
 	metrics.dojoHeight = dojoSize.Y
+	metrics.dojoFootprint = math.max(dojoSize.X, dojoSize.Z)
 
 	-- The interior floor is what the Mini and the bag actually stand on, and it
 	-- sits above the model's lowest point. Falling back to the bounding box
@@ -162,10 +182,11 @@ local function measureTemplates()
 	end
 end
 
--- Y of the dojo's walkable interior floor, in world space, for a given slot.
-local function interiorFloorY(): number
-	local plotTop = CONFIG.PlotSize.Y
-	return plotTop + metrics.dojoPivotToBottom + metrics.dojoFloorTopFromPivot
+-- How far the dojo's walkable interior floor sits above whatever the model is
+-- standing on. The Mini and the bag stand on THAT, not on the model's lowest
+-- point, or both sink into the floorboards.
+local function interiorFloorLift(): number
+	return metrics.dojoPivotToBottom + metrics.dojoFloorTopFromPivot
 end
 
 --[[ Building ]]
@@ -232,7 +253,7 @@ end
 -- made. It stands on the same plot as the dojo rather than in a separate world:
 -- the player has to be able to watch the Mini walk from the bag to the fight and
 -- back without moving the camera.
-local function buildArena(base: Model, origin: CFrame): boolean
+local function buildArena(base: Model, plate: BasePart): boolean
 	if not arenaTemplate then
 		return false
 	end
@@ -248,7 +269,8 @@ local function buildArena(base: Model, origin: CFrame): boolean
 	-- Multiply through the current scale instead.
 	arena:ScaleTo(
 		arenaTemplate:GetScale()
-		* CONFIG.ArenaFootprintStuds
+		* math.min(plate.Size.X, plate.Size.Z)
+		* CONFIG.ArenaPlateFraction
 		/ math.max(templateSize.X, templateSize.Z)
 	)
 
@@ -260,13 +282,16 @@ local function buildArena(base: Model, origin: CFrame): boolean
 		end
 	end
 
-	-- Stand it on the plot: bounding-box bottom flush with the plot surface.
+	-- Stand it in the middle of its plate, bounding-box bottom flush with the
+	-- surface.
 	local box, size = arena:GetBoundingBox()
 	local pivotToBottom = arena:GetPivot().Position.Y - (box.Position.Y - size.Y * 0.5)
 
-	arena:PivotTo(
-		origin * CFrame.new(CONFIG.PitOffsetX, CONFIG.PlotSize.Y + pivotToBottom, 0)
-	)
+	arena:PivotTo(CFrame.new(
+		plate.Position.X,
+		surfaceY(plate) + pivotToBottom,
+		plate.Position.Z
+	))
 	arena.Parent = base
 
 	-- Measured after placing, so the numbers are in world space and survive the
@@ -299,7 +324,7 @@ local function buildPit(base: Model, origin: CFrame)
 		"Pit",
 		Vector3.new(CONFIG.PitRadius * 2, 0.4, CONFIG.PitRadius * 2),
 		Color3.fromRGB(122, 48, 46),
-		origin * CFrame.new(CONFIG.PitOffsetX, CONFIG.PlotSize.Y + 0.2, 0),
+		origin * CFrame.new(0, 1.2, 0),
 		base
 	)
 	floor.Shape = Enum.PartType.Cylinder
@@ -312,7 +337,7 @@ local function buildPit(base: Model, origin: CFrame)
 		"PitRim",
 		Vector3.new(CONFIG.PitRadius * 2 + 0.8, 0.25, CONFIG.PitRadius * 2 + 0.8),
 		Color3.fromRGB(58, 62, 72),
-		origin * CFrame.new(CONFIG.PitOffsetX, CONFIG.PlotSize.Y + 0.08, 0),
+		origin * CFrame.new(0, 1.08, 0),
 		base
 	)
 	rim.Shape = Enum.PartType.Cylinder
@@ -322,15 +347,28 @@ end
 -- The post the player walks up to and presses. TowerService fills in the text
 -- and does the work; the base only owns the furniture. Stands outside whatever
 -- the Mini fights in, so it is reachable with either arena or fallback pit.
-local function buildTowerPost(base: Model, origin: CFrame)
+local function buildTowerPost(
+	base: Model,
+	dojoSpace: BasePart,
+	bridge: BasePart?,
+	plate: BasePart?
+)
+	-- At the dojo end of the bridge, not out at the arena. The player presses
+	-- this while standing over their training Mini, and the Mini then makes the
+	-- walk -- which is the trip that sells the whole loop.
+	local anchor = bridge or plate or dojoSpace
+	local z = if bridge
+		then bridge.Position.Z - bridge.Size.Z * 0.5 + 2.5
+		else anchor.Position.Z
+
 	local post = makePart(
 		"TowerPost",
 		Vector3.new(0.8, 3.2, 0.8),
 		Color3.fromRGB(38, 40, 48),
-		origin * CFrame.new(
-			CONFIG.PitOffsetX,
-			CONFIG.PlotSize.Y + 1.6,
-			-(CONFIG.ArenaFootprintStuds * 0.5 + 1.0)
+		CFrame.new(
+			anchor.Position.X + anchor.Size.X * 0.5 - 1.5,
+			surfaceY(anchor) + 1.6,
+			z
 		),
 		base
 	)
@@ -348,12 +386,16 @@ end
 
 -- Where the coins go. Stands beside the dojo opening so the upgrade is read in
 -- the same glance as the thing it upgrades.
-local function buildBagPost(base: Model, origin: CFrame)
+local function buildBagPost(base: Model, dojoSpace: BasePart, dojo: Model)
 	local post = makePart(
 		"BagPost",
 		Vector3.new(0.8, 3.0, 0.8),
 		Color3.fromRGB(196, 148, 100),
-		origin * CFrame.new(CONFIG.DojoOffsetX - 3.2, CONFIG.PlotSize.Y + 1.5, -3.0),
+		CFrame.new(
+			dojoSpace.Position.X - dojoSpace.Size.X * 0.5 + 2.0,
+			surfaceY(dojoSpace) + 1.5,
+			dojo:GetPivot().Position.Z
+		),
 		base
 	)
 	post.Material = Enum.Material.WoodPlanks
@@ -368,14 +410,16 @@ local function buildBagPost(base: Model, origin: CFrame)
 	prompt.Parent = post
 end
 
-local function buildSign(player: Player, base: Model, origin: CFrame)
-	local height = CONFIG.PlotSize.Y + metrics.dojoHeight + CONFIG.SignClearance
-
+local function buildSign(player: Player, base: Model, dojoSpace: BasePart)
 	local anchor = makePart(
 		"SignAnchor",
 		Vector3.new(0.6, 0.6, 0.6),
 		Color3.fromRGB(30, 32, 38),
-		origin * CFrame.new(0, height, CONFIG.SignOffsetZ),
+		CFrame.new(
+			dojoSpace.Position.X,
+			surfaceY(dojoSpace) + metrics.dojoHeight + CONFIG.SignClearance,
+			dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 - 1.0
+		),
 		base
 	)
 	anchor.Transparency = 1
@@ -419,78 +463,72 @@ end
 
 local function buildBase(player: Player, slot: number): Model
 	local origin = slotCFrame(slot)
-	local plotTop = CONFIG.PlotSize.Y
 
-	local base = Instance.new("Model")
+	-- The plot is the authored map, cloned. Its three platforms are the whole
+	-- geography of the game: the Mini trains at one end, walks the bridge, and
+	-- fights at the other. Laid out in Studio rather than in code, because a
+	-- level is something you look at while you move it.
+	local base = mapTemplate:Clone()
 	base.Name = `MiniBase_{player.UserId}`
 	base:SetAttribute("OwnerUserId", player.UserId)
 	base:SetAttribute("Slot", slot)
 
-	local plot = makePart(
-		"Plot",
-		CONFIG.PlotSize,
-		CONFIG.PlotColor,
-		origin * CFrame.new(0, CONFIG.PlotSize.Y * 0.5, 0),
-		base
-	)
-	plot.Material = Enum.Material.Slate
-	base.PrimaryPart = plot
+	-- Anchored on the dojo end, so slot origin means "where this player's dojo
+	-- is" and the arena trails off behind it.
+	local dojoSpace = mapPart(base, "DojoSpace")
+	assert(dojoSpace, "BaseMap is missing its DojoSpace part")
+
+	base:PivotTo(origin * base:GetPivot():ToObjectSpace(dojoSpace.CFrame):Inverse())
 
 	-- Parented before the props go on, because the arena MEASURES itself with a
 	-- raycast and nothing outside Workspace can be hit by one.
 	base.Parent = basesFolder
 
-	-- A thin lip around the plot edge. Cheap, but it stops the base reading as
-	-- a floating grey rectangle on a grey baseplate.
-	local trim = makePart(
-		"PlotTrim",
-		CONFIG.PlotSize + Vector3.new(1.6, -0.6, 1.6),
-		CONFIG.TrimColor,
-		origin * CFrame.new(0, CONFIG.PlotSize.Y * 0.35, 0),
-		base
-	)
-	trim.Material = Enum.Material.Wood
+	local bridge = mapPart(base, "Bridge")
+	local plate = mapPart(base, "ArenaPlate")
+	local dojoTop = surfaceY(dojoSpace)
 
+	-- The dojo sits at the back of its own space, so the Mini has the floor in
+	-- front of it to walk around on and the player has somewhere to stand.
 	local dojo = dojoTemplate:Clone()
 	dojo.Name = "Dojo"
-	dojo:PivotTo(
-		origin * CFrame.new(CONFIG.DojoOffsetX, plotTop + metrics.dojoPivotToBottom, 0)
-	)
+	dojo:PivotTo(CFrame.new(
+		dojoSpace.Position.X,
+		dojoTop + metrics.dojoPivotToBottom,
+		dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 + metrics.dojoFootprint * 0.5 + 1.0
+	))
 	dojo.Parent = base
-
-	-- How much room the Mini has to roam when it has nothing to do. Measured off
-	-- the dojo floor that was just placed, so a re-exported dojo moves the
-	-- wandering with it. Published on the base because it is the client that
-	-- walks the Mini around -- this is presentation, not state.
-	local floorNode = dojo:FindFirstChild("dojoFloor_Node")
-	local floorPart = floorNode and floorNode:FindFirstChildWhichIsA("BasePart", true)
-
-	if floorPart then
-		base:SetAttribute("WanderCenter", floorPart.Position)
-		-- Inset, so the Mini paces the mat rather than clipping into its own
-		-- walls, and shallower on Z because the bag stands at the back of it.
-		base:SetAttribute("WanderExtents", Vector2.new(
-			math.max(0.4, floorPart.Size.X * 0.5 - 0.35),
-			math.max(0.4, floorPart.Size.Z * 0.5 - 0.35)
-		))
-	end
 
 	local bag = bagTemplate:Clone()
 	bag.Name = "Punchingbag"
-	bag:PivotTo(origin * CFrame.new(
-		CONFIG.DojoOffsetX,
-		interiorFloorY() + metrics.bagPivotToBottom,
-		CONFIG.BagOffsetZ
+	bag:PivotTo(CFrame.new(
+		dojo:GetPivot().Position.X,
+		dojoTop + interiorFloorLift() + metrics.bagPivotToBottom,
+		dojo:GetPivot().Position.Z + CONFIG.BagOffsetZ
 	))
 	bag.Parent = base
 
-	if not buildArena(base, origin) then
-		buildPit(base, origin)
+	-- How much room the Mini has to roam when it has nothing to do: the WHOLE
+	-- dojo platform, not the little mat inside the dojo model. Published on the
+	-- base because it is the client that walks the Mini around -- presentation,
+	-- not state.
+	base:SetAttribute("WanderCenter", Vector3.new(
+		dojoSpace.Position.X,
+		dojoTop,
+		dojoSpace.Position.Z
+	))
+	base:SetAttribute("WanderExtents", Vector2.new(
+		math.max(0.5, dojoSpace.Size.X * 0.5 - 1.5),
+		math.max(0.5, dojoSpace.Size.Z * 0.5 - 1.5)
+	))
+
+	if plate and not buildArena(base, plate) then
+		buildPit(base, CFrame.new(plate.Position.X, 0, plate.Position.Z))
 	end
 
-	buildTowerPost(base, origin)
-	buildBagPost(base, origin)
-	buildSign(player, base, origin)
+	buildTowerPost(base, dojoSpace, bridge, plate)
+	buildBagPost(base, dojoSpace, dojo)
+	buildSign(player, base, dojoSpace)
 
 	return base
 end
@@ -552,19 +590,24 @@ local function placePlayerAtBase(player: Player, character: Model)
 		return
 	end
 
-	local origin = slotCFrame(base:GetAttribute("Slot"))
-	local target = origin * CFrame.new(
-		CONFIG.DojoOffsetX,
-		CONFIG.PlotSize.Y + 3,
-		CONFIG.PlayerSpawnOffsetZ
+	local dojoSpace = mapPart(base, "DojoSpace")
+	if not dojoSpace then
+		return
+	end
+
+	-- On the near edge of their own dojo platform, looking down the length of
+	-- the map: dojo in front of them, bridge beyond it, arena at the end. The
+	-- whole loop is one glance from where they land.
+	local standY = surfaceY(dojoSpace) + 3
+	local target = CFrame.new(
+		dojoSpace.Position.X,
+		standY,
+		dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 + 2.0
 	)
-	-- Face into the dojo, so the first thing on screen is the thing that matters.
-	local lookAt = (origin * CFrame.new(
-		CONFIG.DojoOffsetX,
-		CONFIG.PlotSize.Y + 3,
-		CONFIG.BagOffsetZ
-	)).Position
-	local facing = CFrame.lookAt(target.Position, lookAt)
+	local facing = CFrame.lookAt(
+		target.Position,
+		Vector3.new(dojoSpace.Position.X, standY, dojoSpace.Position.Z + dojoSpace.Size.Z)
+	)
 
 	for attempt = 1, 6 do
 		if character.Parent == nil then
@@ -617,8 +660,14 @@ function MiniBaseService.getTrainingCFrame(player: Player, reach: number?): CFra
 		return nil
 	end
 
-	local origin = slotCFrame(base:GetAttribute("Slot"))
-	local floorY = interiorFloorY()
+	local dojo = base:FindFirstChild("Dojo")
+	local dojoSpace = mapPart(base, "DojoSpace")
+
+	if not dojo or not dojoSpace then
+		return nil
+	end
+
+	local floorY = surfaceY(dojoSpace) + interiorFloorLift()
 
 	-- Aim at the part the punch is supposed to land on. Falling back to the
 	-- authored offset keeps the Mini training rather than standing idle if the
@@ -626,7 +675,7 @@ function MiniBaseService.getTrainingCFrame(player: Player, reach: number?): CFra
 	local body = MiniBaseService.getBagBody(player)
 	local target = body
 		and Vector3.new(body.Position.X, floorY, body.Position.Z)
-		or (origin * CFrame.new(CONFIG.DojoOffsetX, floorY, CONFIG.BagOffsetZ)).Position
+		or (dojo:GetPivot().Position + Vector3.new(0, 0, CONFIG.BagOffsetZ))
 
 	local spot = target - Vector3.new(0, 0, CONFIG.StandOffFromBagZ * (reach or 1))
 
@@ -641,28 +690,26 @@ function MiniBaseService.getPitSpots(player: Player, reach: number?): (CFrame?, 
 		return nil, nil
 	end
 
-	local origin = slotCFrame(base:GetAttribute("Slot"))
+	local plate = mapPart(base, "ArenaPlate")
 
-	-- The arena's sand is well above the plot, and its usable radius is a
-	-- fraction of its footprint -- both measured when it was built. The bare
-	-- fallback pit has neither, so it keeps the old flat numbers.
+	-- The arena's sand is well above its plate -- measured when it was built.
+	-- The bare fallback pit has no such attribute, so it keeps a flat number.
 	local arena = base:FindFirstChild("Arena")
 	local floorY = arena and arena:GetAttribute("FloorY")
-	local ringRadius = arena and arena:GetAttribute("FloorRadius")
+	local centre = if arena
+		then arena:GetPivot().Position
+		else (plate and plate.Position or Vector3.zero)
 
 	if type(floorY) ~= "number" then
-		floorY = CONFIG.PlotSize.Y + 0.4
+		floorY = plate and (surfaceY(plate) + 0.4) or 1.4
 	end
 
-	if type(ringRadius) ~= "number" then
-		ringRadius = CONFIG.PitRadius
-	end
+	-- A bigger fighter squares up from further away -- but the distance is in
+	-- MINI lengths, not arena lengths. See CONFIG.FightGapStuds.
+	local gap = CONFIG.FightGapStuds * (reach or 1)
 
-	-- Same rule as the bag: a bigger fighter squares up from further away.
-	local gap = ringRadius * 0.45 * (reach or 1)
-
-	local fighter = (origin * CFrame.new(CONFIG.PitOffsetX, floorY, -gap)).Position
-	local enemy = (origin * CFrame.new(CONFIG.PitOffsetX, floorY, gap)).Position
+	local fighter = Vector3.new(centre.X, floorY, centre.Z - gap)
+	local enemy = Vector3.new(centre.X, floorY, centre.Z + gap)
 
 	return CFrame.lookAt(fighter, enemy), CFrame.lookAt(enemy, fighter)
 end
@@ -710,6 +757,10 @@ function MiniBaseService.Init(registry)
 	-- The Colyseum is authored as a full-size stadium rather than at Mini scale,
 	-- so it is scaled per base against its own measured footprint instead of by
 	-- MINI_SCALE. Optional on purpose: see arenaTemplate.
+	local mapSource = assets:FindFirstChild("BaseMap")
+	assert(mapSource, "ServerStorage.Assets.BaseMap is missing — the authored DojoSpace/Bridge/ArenaPlate layout must live there")
+	mapTemplate = mapSource:Clone()
+
 	local arenaSource = assets:FindFirstChild("Arena")
 
 	if arenaSource and arenaSource:IsA("Model") then
@@ -725,7 +776,7 @@ function MiniBaseService.Init(registry)
 	if GameConfig.DebugLogging then
 		print(string.format(
 			"[MiniBaseService] templates measured: dojo height %.2f, interior floor Y %.2f, bag lift %.2f",
-			metrics.dojoHeight, interiorFloorY(), metrics.bagPivotToBottom))
+			metrics.dojoHeight, interiorFloorLift(), metrics.bagPivotToBottom))
 	end
 
 	local existing = Workspace:FindFirstChild("MiniBases")
