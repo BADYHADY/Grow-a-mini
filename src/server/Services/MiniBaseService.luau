@@ -36,10 +36,10 @@ local CONFIG = {
 	-- same world, because half the point is watching what everybody else's Mini
 	-- is turning into.
 	Origin = Vector3.new(0, 0, 90),
-	-- Wide enough to clear the 57-stud arena plate with a gap to walk down, and
-	-- deep enough to clear the whole dojo-bridge-arena run.
-	SlotSpacing = 72,
-	RowSpacing = 130,
+	-- Wide enough to clear the arena plate with a gap to walk down, and deep
+	-- enough to clear the whole dojo-bridge-arena run.
+	SlotSpacing = 36,
+	RowSpacing = 70,
 	SlotsPerRow = 5,
 	MaxSlots = 20,
 
@@ -54,9 +54,10 @@ local CONFIG = {
 	-- Small on purpose. The reference game's fighting pit is a fenced square
 	-- fifteen or twenty studs across that the player leans over from outside,
 	-- not a stadium -- and the fighters in it are two studs tall. Built at 0.82
-	-- of a 57-stud plate this was a 47-stud coliseum: the Mini was an ant in it,
-	-- and the player could not see into it at all.
-	ArenaPlateFraction = 0.32,
+	-- of the old 57-stud plate this was a 47-stud coliseum: the Mini was an ant
+	-- in it, and the player could not see into it at all. The plate is 26 studs
+	-- now, so this fraction keeps the pit at the same readable 18.
+	ArenaPlateFraction = 0.69,
 	-- Fallback only, for a place whose Arena asset is missing: the old bare ring
 	-- kept the loop playable rather than leaving the Mini nowhere to fight.
 	PitRadius = 2.4,

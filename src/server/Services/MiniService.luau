@@ -117,6 +117,15 @@ local function agentFor(player: Player, mini: Model): any?
 		AgentHeight = 2.0 * growth,
 		AgentCanJump = false,
 		AgentCanClimb = false,
+
+		-- The ground under the map is walkable as far as the engine is
+		-- concerned, so the Mini used to cut straight across it instead of
+		-- taking the bridge. Anything wearing the OffMap PathfindingModifier is
+		-- priced out of every route: infinite cost is the documented way to
+		-- make a region impassable without making it non-solid.
+		Costs = {
+			OffMap = math.huge,
+		},
 	}, WALK_ARRIVE_RADIUS)
 
 	agents[player] = agent
