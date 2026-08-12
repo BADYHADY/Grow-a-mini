@@ -18,6 +18,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local MiniConfig = require(Shared.Config.MiniConfig)
 local PunchClock = require(Shared.Util.PunchClock)
+local Format = require(Shared.Util.Format)
 
 local TOWER = MiniConfig.Tower
 
@@ -170,6 +171,34 @@ local function showEnemyHealth(run: Run)
 	end
 end
 
+-- The big sign over the pit. Written in the world rather than on the screen, so
+-- the player reads their own progress by looking at it -- and reads everyone
+-- else's by looking at theirs.
+local function updateArenaSign(player: Player, floor: number?)
+	local base = MiniBaseService.getBase(player)
+	local anchor = base and base:FindFirstChild("ArenaSignAnchor")
+	local sign = anchor and anchor:FindFirstChild("ArenaSign")
+
+	if not sign then
+		return
+	end
+
+	local floorLabel = sign:FindFirstChild("Floor")
+	local rewardLabel = sign:FindFirstChild("Reward")
+
+	if floorLabel then
+		-- A single big number is the whole point: floor 20 beats floor 10 and a
+		-- ten-year-old needs no explanation of why.
+		floorLabel.Text = if floor then `FLOOR {floor}` else "COLYSEUM"
+	end
+
+	if rewardLabel then
+		rewardLabel.Text = if floor
+			then `${Format.abbreviate(floorReward(floor))}`
+			else ""
+	end
+end
+
 --[[ Run control ]]
 
 local function startFloor(player: Player, run: Run)
@@ -181,6 +210,8 @@ local function startFloor(player: Player, run: Run)
 	end
 
 	clearEnemy(run)
+
+	updateArenaSign(player, run.floor)
 
 	run.enemyMaxHealth = enemyHealth(run.floor)
 	run.enemyHealth = run.enemyMaxHealth
@@ -203,6 +234,7 @@ end
 local function finishRun(player: Player, run: Run, floorsCleared: number)
 	run.finished = true
 	clearEnemy(run)
+	updateArenaSign(player, nil)
 
 	local data = DataService.getData(player)
 

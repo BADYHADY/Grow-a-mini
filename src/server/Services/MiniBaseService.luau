@@ -49,9 +49,14 @@ local CONFIG = {
 	-- map can be re-edited in Studio without touching this file.
 
 	-- How wide the Colyseum is built, across its outer wall, as a FRACTION of
-	-- the arena plate it stands on. The model is authored as a full-size
-	-- stadium; what matters is that it sits comfortably on its plate.
-	ArenaPlateFraction = 0.82,
+	-- the arena plate it stands on.
+	--
+	-- Small on purpose. The reference game's fighting pit is a fenced square
+	-- fifteen or twenty studs across that the player leans over from outside,
+	-- not a stadium -- and the fighters in it are two studs tall. Built at 0.82
+	-- of a 57-stud plate this was a 47-stud coliseum: the Mini was an ant in it,
+	-- and the player could not see into it at all.
+	ArenaPlateFraction = 0.32,
 	-- Fallback only, for a place whose Arena asset is missing: the old bare ring
 	-- kept the loop playable rather than leaving the Mini nowhere to fight.
 	PitRadius = 2.4,
@@ -328,6 +333,27 @@ local function buildArena(base: Model, plate: BasePart): boolean
 	arena:SetAttribute("FloorY", floorY)
 	arena:SetAttribute("FloorRadius", radius)
 
+	-- The mark the fighter stands on. The reference game paints a bright ring
+	-- under its chicken in the pit, and it does a lot of work: it tells you
+	-- where to look in a wide shot, and it makes an empty arena read as a stage
+	-- waiting for someone rather than as unfinished ground.
+	local mark = Instance.new("Part")
+	mark.Name = "FighterMark"
+	mark.Shape = Enum.PartType.Cylinder
+	mark.Size = Vector3.new(0.08, 1.6, 1.6)
+	mark.CFrame = CFrame.new(
+		plate.Position.X,
+		floorY + 0.04,
+		plate.Position.Z - CONFIG.FightGapStuds
+	) * CFrame.Angles(0, 0, math.rad(90))
+	mark.Anchored = true
+	mark.CanCollide = false
+	mark.CanQuery = false
+	mark.Material = Enum.Material.Neon
+	mark.Color = Color3.fromRGB(64, 226, 200)
+	mark.Transparency = 0.35
+	mark.Parent = base
+
 	if GameConfig.DebugLogging then
 		print(string.format(
 			"[MiniBaseService] arena scaled %.3f, floor Y %.2f, fighting radius %.2f",
@@ -368,6 +394,63 @@ end
 -- The post the player walks up to and presses. TowerService fills in the text
 -- and does the work; the base only owns the furniture. Stands outside whatever
 -- the Mini fights in, so it is reachable with either arena or fallback pit.
+-- The big label over the fighting pit: FLOOR 12, the owner's name, and what
+-- the floor pays. Everything the reference game tells you about a pit is
+-- written in the world above it in huge outlined type, not tucked into a corner
+-- of the screen -- which is also what lets you read someone ELSE's progress
+-- from across the map.
+local function buildArenaSign(player: Player, base: Model, plate: BasePart, height: number)
+	local anchorPart = makePart(
+		"ArenaSignAnchor",
+		Vector3.new(0.6, 0.6, 0.6),
+		Color3.fromRGB(30, 32, 38),
+		CFrame.new(plate.Position.X, surfaceY(plate) + height, plate.Position.Z),
+		base
+	)
+	anchorPart.Transparency = 1
+	anchorPart.CanCollide = false
+	anchorPart.CanQuery = false
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ArenaSign"
+	billboard.Size = UDim2.fromScale(16, 7)
+	billboard.AlwaysOnTop = false
+	billboard.MaxDistance = 260
+	billboard.Parent = anchorPart
+
+	local function label(name: string, y: number, height: number, size: number, colour: Color3)
+		local text = Instance.new("TextLabel")
+		text.Name = name
+		text.Position = UDim2.fromScale(0, y)
+		text.Size = UDim2.fromScale(1, height)
+		text.BackgroundTransparency = 1
+		text.Font = Enum.Font.GothamBlack
+		text.TextScaled = true
+		text.TextColor3 = colour
+		-- Heavy outline. These read against grass, sand and sky alike, which is
+		-- the whole reason the reference game can put its UI in the world.
+		text.TextStrokeTransparency = 0
+		text.TextStrokeColor3 = Color3.fromRGB(24, 20, 32)
+		text.Parent = billboard
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = size
+		stroke.Color = Color3.fromRGB(24, 20, 32)
+		stroke.Parent = text
+
+		return text
+	end
+
+	local floor = label("Floor", 0, 0.46, 4, Color3.fromRGB(255, 255, 255))
+	floor.Text = "COLYSEUM"
+
+	local owner = label("Owner", 0.44, 0.24, 3, Color3.fromRGB(198, 214, 255))
+	owner.Text = `@{player.Name}`
+
+	local reward = label("Reward", 0.68, 0.30, 3, Color3.fromRGB(126, 240, 126))
+	reward.Text = ""
+end
+
 local function buildTowerPost(
 	base: Model,
 	dojoSpace: BasePart,
@@ -566,6 +649,18 @@ local function buildBase(player: Player, slot: number): Model
 
 	if plate and not buildArena(base, plate) then
 		buildPit(base, CFrame.new(plate.Position.X, 0, plate.Position.Z))
+	end
+
+	if plate then
+		local arena = base:FindFirstChild("Arena")
+		local signHeight = 6
+
+		if arena then
+			local _, arenaSize = arena:GetBoundingBox()
+			signHeight = arenaSize.Y + 3
+		end
+
+		buildArenaSign(player, base, plate, signHeight)
 	end
 
 	buildTowerPost(base, dojoSpace, bridge, plate)
