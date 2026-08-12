@@ -216,7 +216,6 @@ local function startFloor(player: Player, run: Run)
 	run.enemyMaxHealth = enemyHealth(run.floor)
 	run.enemyHealth = run.enemyMaxHealth
 	run.model = buildEnemy(player, run.floor, enemySpot)
-	run.paidPunches = 0
 
 	-- Only the first floor of a run needs the walk across the plot; after that
 	-- the Mini is already standing there, so it is just the beat between floors.
@@ -226,8 +225,16 @@ local function startFloor(player: Player, run: Run)
 		if run.epoch then TOWER.FloorBreakSeconds else nil
 	)
 
-	local epoch = select(1, MiniService.getPunchClock(player, "Fighting"))
+	local epoch, rate = MiniService.getPunchClock(player, "Fighting")
 	run.epoch = epoch
+
+	-- The punch clock now runs unbroken across the whole tower run, so its count
+	-- does not restart with the floor. Start this opponent owing nothing for the
+	-- punches thrown at the previous one -- otherwise every floor after the
+	-- first would take the entire run's punches in its first tick and die on
+	-- arrival.
+	run.paidPunches = if epoch and rate then PunchClock.landed(epoch, rate) else 0
+
 	run.pausedUntil = 0
 end
 

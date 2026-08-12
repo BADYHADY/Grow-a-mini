@@ -717,20 +717,46 @@ local delay = settleSeconds or walkSecondsTo(player, spot.Position)
 -- rate made floor 1 -- an opponent two punches wide -- take six seconds.
 local rate = MiniConfig.Tower.AttackRate
 
--- Punch ONE lands almost as soon as the Mini is on the mark.
+-- ONE punch clock for the whole run, not one per floor.
 --
--- The clock counts punch N as floor((now - epoch) * rate), so an epoch set to
--- the arrival time means the first hit does not land until a whole punch
--- period later. With the break between floors on top of it, every cleared
--- opponent was followed by two seconds of a Mini standing perfectly still in
--- front of the next one. Backdating the epoch by very nearly one period puts
--- the swing already in progress on arrival, so it connects immediately.
+-- The tower calls this again for every floor, and it used to mint a fresh
+-- epoch each time. Punch numbering restarted at zero, so the client -- which
+-- derives the swing from the same epoch -- dropped back to its guard and
+-- began again from the right fist. Measured at the rig: the Mini threw two or
+-- three punches, froze in guard for half a second, threw two or three more.
+-- A fight that clears a floor a second was therefore a stutter rather than a
+-- flurry, which is the single biggest reason the combat did not read as
+-- fluid.
+--
+-- So: if the Mini is already fighting on this exact mark, it keeps swinging
+-- and the new opponent simply steps into the rhythm already running.
+local existing = actions[player]
+local continuing = existing ~= nil
+and existing.state == "Fighting"
+and existing.rate == rate
+and existing.epoch ~= nil
+and (existing.cframe.Position - spot.Position).Magnitude < 0.05
+
+if continuing then
+actions[player] = {
+state = "Fighting",
+cframe = spot,
+rate = rate,
+epoch = existing.epoch,
+}
+else
+-- Opening a run: the clock starts so that punch one connects just after the
+-- Mini arrives, rather than a full punch period later. Counting is
+-- floor((now - epoch) * rate), so the epoch is backdated by very nearly one
+-- period and the swing is already in progress on arrival.
 actions[player] = {
 state = "Fighting",
 cframe = spot,
 rate = rate,
 epoch = Workspace:GetServerTimeNow() + delay - 1 / rate + MiniConfig.Tower.WindupSeconds,
 }
+end
+
 applyAction(player, minis[player])
 end
 

@@ -94,6 +94,16 @@ bagWear: number,
 bagTintStep: number,
 bagPartColors: { [BasePart]: Color3 }?,
 bagLeanAxis: Vector3?,
+-- The part of the bag that reads as the point of contact.
+bagSpeaker: BasePart?,
+
+-- The opponent standing in front of it, and how hard it was last hit. The
+-- enemy model is built and owned by the server, but nothing on the server ever
+-- moves it -- so knocking it back is presentation, done here, driven off the
+-- same punch clock that decides the damage.
+enemyModel: Model?,
+enemyRestPivot: CFrame?,
+enemyRecoil: number,
 }
 
 
@@ -407,6 +417,113 @@ return (1 - u) * (1 - u)
 end
 
 
+-- How far back a hit shoves the opponent, and how fast it recovers. Small: a
+-- fighter that is knocked halfway across the pit by a jab reads as a physics
+-- glitch, and the Mini has to still be within arm's reach for the next one.
+-- The punch sound hangs on the FIGHTER, not on what it is hitting, so it is
+-- heard wherever the Mini happens to be swinging. Parented to a part, so it
+-- stays positional for free: you hear a Mini working only when you are standing
+-- at its plot.
+local function punchSpeaker(state: MiniState): Sound?
+if state.punchSound and state.punchSound.Parent then
+return state.punchSound
+end
+
+local host = state.model:FindFirstChild("UpperTorso") or state.model.PrimaryPart
+
+if not host then
+return nil
+end
+
+local sound = Instance.new("Sound")
+sound.Name = "MiniPunch"
+sound.SoundId = TRAINING.PunchSoundId
+sound.Volume = TRAINING.PunchSoundVolume
+sound.RollOffMode = Enum.RollOffMode.InverseTapered
+sound.RollOffMinDistance = TRAINING.PunchSoundMinDistance
+sound.RollOffMaxDistance = TRAINING.PunchSoundMaxDistance
+sound.Parent = host
+
+state.punchSound = sound
+
+return sound
+end
+
+
+local ENEMY_RECOIL_STUDS = 0.35
+local ENEMY_RECOIL_DECAY_PER_SECOND = 9
+
+-- The opponent TowerService stood up for the current floor.
+--
+-- It is a sibling of the bases rather than a child of this player's base --
+-- TowerService parents it straight into the MiniBases folder -- so it is found
+-- by the name the server gives it. Re-resolved every time it dies, because a
+-- cleared floor destroys its enemy and builds the next one in its place.
+local function resolveEnemy(state: MiniState): Model?
+if state.enemyModel and state.enemyModel.Parent then
+return state.enemyModel
+end
+
+state.enemyModel = nil
+state.enemyRestPivot = nil
+state.enemyRecoil = 0
+
+local bases = Workspace:FindFirstChild("MiniBases")
+local enemy = bases and bases:FindFirstChild(`TowerEnemy_{state.owner.UserId}`)
+
+if not enemy or not enemy:IsA("Model") then
+return nil
+end
+
+state.enemyModel = enemy
+state.enemyRestPivot = enemy:GetPivot()
+
+return enemy
+end
+
+
+-- Settles a knocked-back opponent to where it was standing. Stepped every
+-- frame, like the bag, so recovery is smooth rather than a snap on the next
+-- punch.
+local function updateEnemy(state: MiniState, dt: number)
+local model = state.enemyModel
+local rest = state.enemyRestPivot
+
+if not model or not rest then
+return
+end
+
+if not model.Parent then
+state.enemyModel = nil
+state.enemyRestPivot = nil
+state.enemyRecoil = 0
+return
+end
+
+if state.enemyRecoil <= 0.001 then
+return
+end
+
+state.enemyRecoil = math.max(
+0,
+state.enemyRecoil - state.enemyRecoil * ENEMY_RECOIL_DECAY_PER_SECOND * dt
+)
+
+-- Straight back along the line from the Mini, so it is shoved away from the
+-- punch rather than in some fixed world direction.
+local root = state.model.PrimaryPart
+local away = if root
+then horizontal(rest.Position - root.Position)
+else Vector3.zero
+
+if away.Magnitude < 0.01 then
+return
+end
+
+model:PivotTo(rest + away.Unit * (state.enemyRecoil * ENEMY_RECOIL_STUDS))
+end
+
+
 -- The bag lives on the owner's base, which is built by MiniBaseService under
 -- these names. Resolved lazily: the base may still be replicating when the Mini
 -- first arrives.
@@ -450,9 +567,7 @@ end
 state.bagPartColors = colors
 state.bagTintStep = 0
 
--- The impact sound belongs to the bag, not the listener: parenting it to the
--- part makes it positional for free, so you only hear a Mini training when you
--- are standing at that plot.
+-- Which part of the bag reads as the point of contact, for the impact effect.
 local speaker
 
 for _, descendant in body:GetDescendants() do
@@ -466,18 +581,13 @@ end
 end
 end
 
-if speaker and not state.punchSound then
-local sound = Instance.new("Sound")
-sound.Name = "MiniPunch"
-sound.SoundId = TRAINING.PunchSoundId
-sound.Volume = TRAINING.PunchSoundVolume
-sound.RollOffMode = Enum.RollOffMode.InverseTapered
-sound.RollOffMinDistance = TRAINING.PunchSoundMinDistance
-sound.RollOffMaxDistance = TRAINING.PunchSoundMaxDistance
-sound.Parent = speaker
+state.bagSpeaker = speaker
 
-state.punchSound = sound
-end
+-- The impact SOUND is no longer created here. It used to be parented to the
+-- bag, which meant a Mini fighting in the Colyseum played its punch sound and
+-- spawned its impact effect back at the dojo, thirty studs away -- the fight
+-- was silent at the point of contact. It now hangs on the Mini itself and
+-- travels with it; see punchSpeaker.
 
 -- The bag swings from where the chains hold it, not from its middle.
 state.bagAnchor = Vector3.new(
@@ -651,12 +761,29 @@ and t >= TRAINING.WindupFraction + TRAINING.StrikeFraction
 then
 state.impactPending = false
 
+-- A punch lands on whatever the Mini is standing in front of: the bag at
+-- home, the opponent in the Colyseum. Both get shoved, and the impact is
+-- drawn and heard at the point of contact rather than always at the bag.
+local target: BasePart? = nil
+
+if state.model:GetAttribute("ActionState") == "Fighting" then
+local enemy = resolveEnemy(state)
+
+if enemy then
+state.enemyRecoil = 1
+
+target = enemy.PrimaryPart or enemy:FindFirstChildWhichIsA("BasePart")
+end
+else
 resolveBag(state)
 
 state.bagAngularVelocity +=
 TRAINING.BagImpulseRadiansPerSecond
 
-if state.punchSound then
+target = state.bagSpeaker
+end
+
+if punchSpeaker(state) then
 -- Identical samples in a row read as a machine gun.
 state.punchSound.PlaybackSpeed =
 1
@@ -665,9 +792,11 @@ state.punchSound.PlaybackSpeed =
 
 state.punchSound.TimePosition = 0
 state.punchSound:Play()
+end
 
+if target then
 Effects.punchImpact(
-state.punchSound.Parent,
+target,
 state.model:GetScale() / MiniConfig.Scale.Overall
 )
 end
@@ -1059,6 +1188,10 @@ bagRestPivot = nil,
 bagAnchor = nil,
 bagAngle = 0,
 bagAngularVelocity = 0,
+
+enemyModel = nil,
+enemyRestPivot = nil,
+enemyRecoil = 0,
 }
 
 if GameConfig.DebugLogging then
@@ -1117,7 +1250,14 @@ Fighting = true,
 -- How close to its mark the Mini has to be before it starts throwing punches.
 -- The Humanoid parks within a fraction of a stud of where it was sent, and the
 -- punch was measured against the bag with that slack already in it.
-local WORKING_RADIUS_STUDS = 0.9
+--
+-- Measured in the arena, the Mini parks 0.87 studs from its mark: three
+-- hundredths of a stud inside the old limit of 0.9, with the ENTIRE punch
+-- animation on the far side of it. A fighter that stands still through the
+-- whole fight because the pathfinder stopped a centimetre short is not a
+-- failure worth having, so the margin is real now. Walking away is still
+-- unambiguous -- the hysteresis below releases at twice this.
+local WORKING_RADIUS_STUDS = 2.0
 
 
 -- WHERE the Mini is is no longer decided here.
@@ -1233,6 +1373,10 @@ end
 -- Always stepped, so a bag keeps swinging out after the Mini stops
 -- rather than freezing mid-arc.
 updateBag(state, dt)
+
+-- Same reason: a knocked-back opponent settles back to its mark under
+-- its own steam instead of snapping there on the next punch.
+updateEnemy(state, dt)
 end
 end)
 
