@@ -251,7 +251,23 @@ FullPersonalityDistanceStuds = 80,
 	-- That idling IS the user interface: no popup tells the player their fighter
 	-- is ready, they just see it stop hitting things.
 	Wander = {
+	-- Fallback only. The real roaming area is the dojo floor, measured by
+	-- MiniBaseService and published on the base -- the Mini should have the run
+	-- of its own gym, not pace a circle in the middle of it.
 	RadiusStuds = 1.6,
+
+	-- Close enough to call it arrived and start standing about. Deliberately
+	-- loose: the arrival easing brakes from nearly three studs out, which is
+	-- most of the width of the dojo, so a tight radius means the Mini spends
+	-- the whole trip creeping the last stud instead of walking anywhere.
+	ArriveRadiusStuds = 0.8,
+	-- A Mini that shuffles a few inches at a time reads as broken rather than
+	-- as restless, so a new spot has to be an actual walk away.
+	MinTripStuds = 1.4,
+	-- How long it stands at a spot before choosing another. The spread is what
+	-- keeps it from looking like it is on a timer.
+	LookSecondsMin = 0.9,
+	LookSecondsMax = 2.6,
 
 	-- Speed for every trip the Mini makes under its own steam: to the bag, out
 	-- to the pit, home again. Deliberately far slower than MoveSpeed, which
@@ -260,9 +276,9 @@ FullPersonalityDistanceStuds = 80,
 	TravelSpeedStuds = 6.5,
 	-- Slow. A Mini that sprints between points reads as panicked rather than as
 	-- a fighter with nothing to do.
-	SpeedStuds = 2.4,
-	PauseSecondsMin = 1.2,
-	PauseSecondsMax = 3.0,
+	SpeedStuds = 3.2,
+	PauseSecondsMin = 1.6,
+	PauseSecondsMax = 5.5,
 
 	-- Roblox's stock R15 walk cycle, played on the Mini's OWN Animator. While
 	-- the Mini is on its own business the owner's pose is not mirrored, so it

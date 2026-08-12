@@ -61,6 +61,9 @@ impactPending: boolean,
 -- Idling around the dojo, and the legs it does that on.
 wanderTarget: Vector3?,
 wanderPauseUntil: number,
+-- What it is looking at while it stands about, and for how long.
+wanderLook: Vector3?,
+wanderLookUntil: number,
 walkTrack: AnimationTrack?,
 walkPlaying: boolean,
 
@@ -1024,6 +1027,8 @@ impactPending = false,
 
 wanderTarget = nil,
 wanderPauseUntil = 0,
+wanderLook = nil,
+wanderLookUntil = 0,
 walkTrack = nil,
 walkPlaying = false,
 
@@ -1159,50 +1164,93 @@ Fighting = true,
 }
 
 
--- While it is topped up the Mini has nowhere it needs to be, so it picks its own
--- spots around the dojo floor. That aimless pottering is the "ready" signal --
--- no popup tells the player anything, they just see it stop working.
+-- The floor the Mini is allowed to roam, measured off the real dojo by
+-- MiniBaseService and published on the base. Falls back to a small circle
+-- around the training spot for a base built before that existed.
+local function wanderArea(state: MiniState, spot: CFrame): (Vector3, Vector2)
+local bases = Workspace:FindFirstChild("MiniBases")
+local base = bases and bases:FindFirstChild(`MiniBase_{state.owner.UserId}`)
+
+local centre = base and base:GetAttribute("WanderCenter")
+local extents = base and base:GetAttribute("WanderExtents")
+
+if typeof(centre) == "Vector3" and typeof(extents) == "Vector2" then
+-- The floor's own Y is the model's centre, not its surface. The training
+-- spot is already on the surface, so take the height from there.
+return Vector3.new(centre.X, spot.Position.Y, centre.Z), extents
+end
+
+return spot.Position, Vector2.new(WANDER.RadiusStuds, WANDER.RadiusStuds)
+end
+
+
+-- While it is topped up the Mini has nowhere it needs to be, so it goes and
+-- lives its own life on the dojo floor: crosses the mat, stops, looks around,
+-- picks somewhere else. That aimless pottering is the "ready" signal -- no popup
+-- tells the player anything, they just see it stop working and start mooching.
+--
+-- Returns where it is heading, and what to face when it gets there. A facing of
+-- nil means "look where you are walking".
 local function wanderTarget(
 state: MiniState,
 spot: CFrame
-): Vector3
+): (Vector3, Vector3?)
 
 local now = os.clock()
+local arrived =
+state.wanderTarget ~= nil
+and (horizontal(state.position - state.wanderTarget)).Magnitude
+< WANDER.ArriveRadiusStuds
 
-if state.wanderTarget
-and now < state.wanderPauseUntil
-then
-return state.wanderTarget
-end
-
-
-local reached =
-state.wanderTarget == nil
-or (horizontal(state.position - state.wanderTarget)).Magnitude < 0.25
-
-if not reached then
-return state.wanderTarget
-end
-
-
+-- Standing at the last spot with time still on the clock: this is the pause,
+-- and the Mini spends it turning to look at things rather than freezing
+-- mid-floor like a mannequin.
+if state.wanderTarget and (now < state.wanderPauseUntil or not arrived) then
+if arrived and now >= state.wanderLookUntil then
 local angle = math.random() * math.pi * 2
-local radius = math.sqrt(math.random()) * WANDER.RadiusStuds
 
-state.wanderTarget =
-spot.Position
+state.wanderLook = Vector3.new(math.cos(angle), 0, math.sin(angle))
+state.wanderLookUntil = now
++ WANDER.LookSecondsMin
++ math.random() * (WANDER.LookSecondsMax - WANDER.LookSecondsMin)
+end
+
+return state.wanderTarget, if arrived then state.wanderLook else nil
+end
+
+
+local centre, extents = wanderArea(state, spot)
+
+-- Somewhere else on the mat, and deliberately not somewhere near: a Mini that
+-- shuffles six inches at a time reads as broken rather than as restless.
+local target
+
+for _ = 1, 6 do
+local candidate = centre
 + Vector3.new(
-math.cos(angle) * radius,
+(math.random() * 2 - 1) * extents.X,
 0,
-math.sin(angle) * radius
+(math.random() * 2 - 1) * extents.Y
 )
 
-state.wanderPauseUntil =
-now
-+ WANDER.PauseSecondsMin
-+ math.random()
-* (WANDER.PauseSecondsMax - WANDER.PauseSecondsMin)
+target = candidate
 
-return state.wanderTarget
+if not state.wanderTarget
+or (horizontal(candidate - state.wanderTarget)).Magnitude
+> WANDER.MinTripStuds
+then
+break
+end
+end
+
+state.wanderTarget = target
+state.wanderPauseUntil = now
++ WANDER.PauseSecondsMin
++ math.random() * (WANDER.PauseSecondsMax - WANDER.PauseSecondsMin)
+-- Cleared so the Mini picks a fresh thing to look at once it arrives.
+state.wanderLookUntil = 0
+
+return state.wanderTarget, nil
 end
 
 
@@ -1228,10 +1276,11 @@ end
 
 
 if action == "Ready" then
-local target = wanderTarget(state, spot)
+local target, facing = wanderTarget(state, spot)
 
--- Faces wherever it is ambling, so it reads as walking rather than sliding.
-return target + Vector3.new(0, state.groundOffset, 0), nil
+-- Facing is nil while it is walking, so it looks where it is going; once it
+-- arrives the wander hands us something for it to turn and look at.
+return target + Vector3.new(0, state.groundOffset, 0), facing
 end
 
 

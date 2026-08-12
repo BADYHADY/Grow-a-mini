@@ -38,15 +38,22 @@ local CONFIG = {
 	MaxSlots = 20,
 
 	-- The plot carries a full-size player walking around a Mini-size dojo AND a
-	-- Mini-size pit, so it is sized for the player even though everything
+	-- Mini-size arena, so it is sized for the player even though everything
 	-- standing on it is not. Wide rather than deep: the two halves of the loop
 	-- sit side by side, both visible from where the player spawns.
-	PlotSize = Vector3.new(22, 1, 14),
+	PlotSize = Vector3.new(26, 1, 14),
 
-	-- Dojo on the left, pit on the right. The Mini's whole life is a walk
-	-- between these two points.
-	DojoOffsetX = -4.0,
-	PitOffsetX = 6.0,
+	-- Dojo on the left, Colyseum on the right. The Mini's whole life is a walk
+	-- between these two points. The offsets keep the dojo's 16-stud footprint
+	-- and the arena's from touching.
+	DojoOffsetX = -5.5,
+	PitOffsetX = 7.5,
+	-- How wide the arena is built, across its outer wall. The model is authored
+	-- at 45 studs -- a real stadium -- and is scaled down to this, because the
+	-- fighters standing in it are two studs tall.
+	ArenaFootprintStuds = 10.0,
+	-- Fallback only, for a place whose Arena asset is missing: the old bare ring
+	-- kept the loop playable rather than leaving the Mini nowhere to fight.
 	PitRadius = 2.4,
 	PlotColor = Color3.fromRGB(58, 62, 72),
 	TrimColor = Color3.fromRGB(196, 148, 100),
@@ -82,6 +89,9 @@ local AnalyticsService
 local basesFolder: Folder
 local dojoTemplate: Model
 local bagTemplate: Model
+-- Optional: a place without it falls back to the bare pit, so a missing art
+-- asset degrades the look rather than breaking the loop.
+local arenaTemplate: Model?
 
 -- Measured from the templates at boot. See the header for why.
 local metrics = {
@@ -173,9 +183,117 @@ local function makePart(name: string, size: Vector3, color: Color3, cframe: CFra
 	return part
 end
 
--- The pit is where training gets spent. Deliberately a bare ring on the same
--- plot rather than a separate world: the player has to be able to watch the Mini
--- walk from the bag to the fight and back without moving the camera.
+-- Where the arena's sand actually is, and how much of it is flat enough to
+-- fight on. Both are MEASURED off the built model rather than derived from the
+-- bounding box, because the model is a stadium: most of its height is seating,
+-- and its floor sits well above its base. Probing outward from the middle finds
+-- the point where the sand stops and the terracing begins.
+local function measureArenaFloor(arena: Model): (number?, number?)
+	local box, size = arena:GetBoundingBox()
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { arena }
+
+	local function probe(offset: number): number?
+		local from = box.Position
+			+ Vector3.new(offset, size.Y, 0)
+		local hit = Workspace:Raycast(from, Vector3.new(0, size.Y * 2, 0) * -1, params)
+
+		return hit and hit.Position.Y or nil
+	end
+
+	local floorY = probe(0)
+
+	if not floorY then
+		return nil, nil
+	end
+
+	-- Walk outward in small steps until the ground stops being the floor. The
+	-- last step that was still level is the usable radius.
+	local limit = size.X * 0.5
+	local step = limit / 24
+	local radius = step
+
+	for offset = step, limit, step do
+		local y = probe(offset)
+
+		if not y or math.abs(y - floorY) > 0.02 * size.Y then
+			break
+		end
+
+		radius = offset
+	end
+
+	return floorY, radius
+end
+
+-- The Colyseum. Where strength is MEASURED, as against the dojo where it is
+-- made. It stands on the same plot as the dojo rather than in a separate world:
+-- the player has to be able to watch the Mini walk from the bag to the fight and
+-- back without moving the camera.
+local function buildArena(base: Model, origin: CFrame): boolean
+	if not arenaTemplate then
+		return false
+	end
+
+	local arena = arenaTemplate:Clone()
+	arena.Name = "Arena"
+
+	local _, templateSize = arenaTemplate:GetBoundingBox()
+
+	-- Model:ScaleTo is ABSOLUTE against the model's authored size, not relative
+	-- to how big it is right now. This asset was saved already scaled up, so
+	-- passing the ratio straight in shrinks it to a third of the intended size.
+	-- Multiply through the current scale instead.
+	arena:ScaleTo(
+		arenaTemplate:GetScale()
+		* CONFIG.ArenaFootprintStuds
+		/ math.max(templateSize.X, templateSize.Z)
+	)
+
+	-- The asset is unanchored, and an unanchored stadium falls through the plot
+	-- the moment the game starts.
+	for _, descendant in arena:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+		end
+	end
+
+	-- Stand it on the plot: bounding-box bottom flush with the plot surface.
+	local box, size = arena:GetBoundingBox()
+	local pivotToBottom = arena:GetPivot().Position.Y - (box.Position.Y - size.Y * 0.5)
+
+	arena:PivotTo(
+		origin * CFrame.new(CONFIG.PitOffsetX, CONFIG.PlotSize.Y + pivotToBottom, 0)
+	)
+	arena.Parent = base
+
+	-- Measured after placing, so the numbers are in world space and survive the
+	-- model being re-exported with different proportions.
+	local floorY, radius = measureArenaFloor(arena)
+
+	if not floorY or not radius then
+		warn("[MiniBaseService] could not find the arena floor; falling back to the bare pit")
+		arena:Destroy()
+		return false
+	end
+
+	arena:SetAttribute("FloorY", floorY)
+	arena:SetAttribute("FloorRadius", radius)
+
+	if GameConfig.DebugLogging then
+		print(string.format(
+			"[MiniBaseService] arena scaled %.3f, floor Y %.2f, fighting radius %.2f",
+			arena:GetScale(), floorY, radius
+		))
+	end
+
+	return true
+end
+
+-- Fallback for a place with no Arena asset: a bare ring, which is what the game
+-- fought in before the Colyseum existed. Keeps the loop playable.
 local function buildPit(base: Model, origin: CFrame)
 	local floor = makePart(
 		"Pit",
@@ -199,9 +317,12 @@ local function buildPit(base: Model, origin: CFrame)
 	)
 	rim.Shape = Enum.PartType.Cylinder
 	rim.CFrame = rim.CFrame * CFrame.Angles(0, 0, math.rad(90))
+end
 
-	-- The post the player walks up to and presses. TowerService fills in the
-	-- text and does the work; the base only owns the furniture.
+-- The post the player walks up to and presses. TowerService fills in the text
+-- and does the work; the base only owns the furniture. Stands outside whatever
+-- the Mini fights in, so it is reachable with either arena or fallback pit.
+local function buildTowerPost(base: Model, origin: CFrame)
 	local post = makePart(
 		"TowerPost",
 		Vector3.new(0.8, 3.2, 0.8),
@@ -209,7 +330,7 @@ local function buildPit(base: Model, origin: CFrame)
 		origin * CFrame.new(
 			CONFIG.PitOffsetX,
 			CONFIG.PlotSize.Y + 1.6,
-			-(CONFIG.PitRadius + 1.4)
+			-(CONFIG.ArenaFootprintStuds * 0.5 + 1.0)
 		),
 		base
 	)
@@ -217,7 +338,7 @@ local function buildPit(base: Model, origin: CFrame)
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "TowerPrompt"
-	prompt.ObjectText = "TOWER"
+	prompt.ObjectText = "COLYSEUM"
 	prompt.ActionText = "SEND MINI"
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 12
@@ -315,6 +436,10 @@ local function buildBase(player: Player, slot: number): Model
 	plot.Material = Enum.Material.Slate
 	base.PrimaryPart = plot
 
+	-- Parented before the props go on, because the arena MEASURES itself with a
+	-- raycast and nothing outside Workspace can be hit by one.
+	base.Parent = basesFolder
+
 	-- A thin lip around the plot edge. Cheap, but it stops the base reading as
 	-- a floating grey rectangle on a grey baseplate.
 	local trim = makePart(
@@ -333,6 +458,23 @@ local function buildBase(player: Player, slot: number): Model
 	)
 	dojo.Parent = base
 
+	-- How much room the Mini has to roam when it has nothing to do. Measured off
+	-- the dojo floor that was just placed, so a re-exported dojo moves the
+	-- wandering with it. Published on the base because it is the client that
+	-- walks the Mini around -- this is presentation, not state.
+	local floorNode = dojo:FindFirstChild("dojoFloor_Node")
+	local floorPart = floorNode and floorNode:FindFirstChildWhichIsA("BasePart", true)
+
+	if floorPart then
+		base:SetAttribute("WanderCenter", floorPart.Position)
+		-- Inset, so the Mini paces the mat rather than clipping into its own
+		-- walls, and shallower on Z because the bag stands at the back of it.
+		base:SetAttribute("WanderExtents", Vector2.new(
+			math.max(0.4, floorPart.Size.X * 0.5 - 0.35),
+			math.max(0.4, floorPart.Size.Z * 0.5 - 0.35)
+		))
+	end
+
 	local bag = bagTemplate:Clone()
 	bag.Name = "Punchingbag"
 	bag:PivotTo(origin * CFrame.new(
@@ -342,11 +484,14 @@ local function buildBase(player: Player, slot: number): Model
 	))
 	bag.Parent = base
 
-	buildPit(base, origin)
+	if not buildArena(base, origin) then
+		buildPit(base, origin)
+	end
+
+	buildTowerPost(base, origin)
 	buildBagPost(base, origin)
 	buildSign(player, base, origin)
 
-	base.Parent = basesFolder
 	return base
 end
 
@@ -497,9 +642,24 @@ function MiniBaseService.getPitSpots(player: Player, reach: number?): (CFrame?, 
 	end
 
 	local origin = slotCFrame(base:GetAttribute("Slot"))
-	local floorY = CONFIG.PlotSize.Y + 0.4
+
+	-- The arena's sand is well above the plot, and its usable radius is a
+	-- fraction of its footprint -- both measured when it was built. The bare
+	-- fallback pit has neither, so it keeps the old flat numbers.
+	local arena = base:FindFirstChild("Arena")
+	local floorY = arena and arena:GetAttribute("FloorY")
+	local ringRadius = arena and arena:GetAttribute("FloorRadius")
+
+	if type(floorY) ~= "number" then
+		floorY = CONFIG.PlotSize.Y + 0.4
+	end
+
+	if type(ringRadius) ~= "number" then
+		ringRadius = CONFIG.PitRadius
+	end
+
 	-- Same rule as the bag: a bigger fighter squares up from further away.
-	local gap = CONFIG.PitRadius * 0.45 * (reach or 1)
+	local gap = ringRadius * 0.45 * (reach or 1)
 
 	local fighter = (origin * CFrame.new(CONFIG.PitOffsetX, floorY, -gap)).Position
 	local enemy = (origin * CFrame.new(CONFIG.PitOffsetX, floorY, gap)).Position
@@ -546,6 +706,17 @@ function MiniBaseService.Init(registry)
 
 	bagTemplate = bagSource:Clone()
 	bagTemplate:ScaleTo(MINI_SCALE)
+
+	-- The Colyseum is authored as a full-size stadium rather than at Mini scale,
+	-- so it is scaled per base against its own measured footprint instead of by
+	-- MINI_SCALE. Optional on purpose: see arenaTemplate.
+	local arenaSource = assets:FindFirstChild("Arena")
+
+	if arenaSource and arenaSource:IsA("Model") then
+		arenaTemplate = arenaSource:Clone()
+	else
+		warn("[MiniBaseService] ServerStorage.Assets.Arena is missing — using the bare pit")
+	end
 
 	-- Measured AFTER scaling, so every downstream placement is already in
 	-- Mini units and no call site has to remember to convert.
