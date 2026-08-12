@@ -15,6 +15,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MiniConfig = require(Shared.Config.MiniConfig)
 local GameConfig = require(Shared.Config.GameConfig)
+local PathAgent = require(Shared.Util.PathAgent)
 
 -- How long the Mini stays beside its owner before walking off to train.
 -- Long enough for the "that tiny fighter is ME" beat to land, short enough that
@@ -47,7 +48,6 @@ state: string,
 cframe: CFrame?,
 rate: number?,
 epoch: number?,
-route: { Vector3 }?,
 },
 } = {}
 
@@ -61,119 +61,101 @@ route: { Vector3 }?,
 -- The server drives it because where the Mini is IS part of what it is doing.
 -- The client no longer guesses.
 
--- Bumped whenever a new order arrives, which is how the walk in progress knows
--- to abandon what it was doing. This is what makes a command instant: press
--- FOLLOW ME mid-journey and the current leg is dropped on the spot.
-local walkGenerations: { [Player]: number } = {}
-
--- Humanoid:MoveTo abandons the walk after eight seconds; a long leg is simply
--- re-issued before that runs out.
-local WALK_REISSUE_SECONDS = 0.25
--- Waypoints are corners to round, not marks to hit.
+-- Waypoints are corners to round, not marks to hit. Shared with the path agent
+-- so "already heading there" and "arrived" agree on what close enough means.
 local WALK_ARRIVE_RADIUS = 1.2
--- If a leg is not done by now the Mini is stuck on something. Move on.
-local WALK_LEG_TIMEOUT = 20
+
+-- The route is published as numbered attributes because attributes cannot hold
+-- a table, and this replicates to every client for free -- the same reason the
+-- rest of the action is published this way.
+local function publishRoute(mini: Model, points: { Vector3 }?)
+	local previous = mini:GetAttribute("RouteCount") or 0
+
+	for index = 1, math.max(previous, points and #points or 0) do
+		mini:SetAttribute(`RoutePoint{index}`, points and points[index] or nil)
+	end
+
+	mini:SetAttribute("RouteCount", points and #points or nil)
+end
 
 local function humanoidOf(mini: Model?): Humanoid?
 	return mini and mini:FindFirstChildOfClass("Humanoid") or nil
 end
 
--- Walk one leg. Humanoid:MoveTo gives up on its own after eight seconds, so a
--- long leg has to be re-issued; returns false if the order was superseded.
-local function walkLeg(
-	player: Player,
-	humanoid: Humanoid,
-	point: Vector3,
-	generation: number
-): boolean
-	local deadline = os.clock() + WALK_LEG_TIMEOUT
+-- One walking agent per Mini, rebuilt whenever the model is replaced by the
+-- real-appearance swap.
+local agents: { [Player]: any } = {}
 
-	while os.clock() < deadline do
-		if walkGenerations[player] ~= generation or not humanoid.Parent then
-			return false
-		end
+-- Where the walk currently under way is headed, so a fresh order for the SAME
+-- place does not restart it. The tower issues a new Fighting action for every
+-- floor, and restarting each time left the Mini fighting the run from its dojo.
+local walkDestinations: { [Player]: Vector3? } = {}
 
-		humanoid:MoveTo(point)
+local function agentFor(player: Player, mini: Model): any?
+	local humanoid = humanoidOf(mini)
 
-		local root = humanoid.RootPart
-
-		if root then
-			local flat = Vector3.new(
-				point.X - root.Position.X,
-				0,
-				point.Z - root.Position.Z
-			)
-
-			if flat.Magnitude <= WALK_ARRIVE_RADIUS then
-				return true
-			end
-		end
-
-		task.wait(WALK_REISSUE_SECONDS)
+	if not humanoid then
+		return nil
 	end
 
-	-- Out of time: something is in the way. Give up on this leg rather than
-	-- standing in place forever -- the next one may well be reachable.
-	return true
+	local existing = agents[player]
+
+	if existing and existing.humanoid == humanoid then
+		return existing
+	end
+
+	if existing then
+		existing:cancel()
+	end
+
+	local growth = MiniService.getGrowth(player)
+
+	-- Sized as the two-stud fighter it is. Given a player's dimensions instead,
+	-- PathfindingService reports NoPath through gaps the Mini walks easily.
+	local agent = PathAgent.new(humanoid, {
+		AgentRadius = 0.5 * growth,
+		AgentHeight = 2.0 * growth,
+		AgentCanJump = false,
+		AgentCanClimb = false,
+	}, WALK_ARRIVE_RADIUS)
+
+	agents[player] = agent
+
+	return agent
 end
 
--- Where the walk currently under way is headed, so a new order for the SAME
--- place does not restart it. The tower issues a fresh Fighting action for every
--- floor, and without this each floor cancelled the walk to the arena -- leaving
--- the Mini fighting the whole run from inside its own dojo.
-local walkDestinations: { [Player]: Vector3 } = {}
+-- Send the Mini somewhere and let the agent get it there. Publishes the route it
+-- chose so every client can see the same journey.
+local function driveTo(player: Player, mini: Model, destination: Vector3?, facing: CFrame?)
+	local agent = agentFor(player, mini)
 
--- The generation of the journey still under way, if any. Callers wait on this
--- rather than on a stopwatch: a walk across the map takes as long as it takes,
--- and guessing produced a Mini that was ordered home again while still walking
--- home -- so it turned round and went back for the order it had already been
--- given.
-local walkActive: { [Player]: number? } = {}
-
-local function driveRoute(player: Player, mini: Model, route: { Vector3 }?, facing: CFrame?)
-	local generation = (walkGenerations[player] or 0) + 1
-	walkGenerations[player] = generation
-	walkDestinations[player] = route and route[#route] or nil
-	walkActive[player] = generation
-
-	if GameConfig.DebugLogging then
-		print(string.format(
-			"[MiniService] %s walk gen %d: %d leg(s)",
-			player.Name, generation, route and #route or 0
-		))
+	if not agent then
+		return
 	end
 
+	if not destination then
+		agent:cancel()
+		walkDestinations[player] = nil
+		publishRoute(mini, nil)
+		return
+	end
+
+	walkDestinations[player] = destination
+
 	task.spawn(function()
-		local humanoid = humanoidOf(mini)
+		agent:walkTo(destination, function(points)
+			publishRoute(mini, points)
+		end)
 
-		if not humanoid then
-			warn(`[MiniService] {player.Name} walk gen {generation}: no humanoid`)
+		if walkDestinations[player] ~= destination then
 			return
 		end
 
-		for index, point in route or {} do
-			if not walkLeg(player, humanoid, point, generation) then
-				if GameConfig.DebugLogging then
-					print(string.format(
-						"[MiniService] %s walk gen %d superseded on leg %d/%d",
-						player.Name, generation, index, #route
-					))
-				end
-				return
-			end
-		end
+		publishRoute(mini, nil)
 
-		if walkGenerations[player] ~= generation then
-			return
-		end
-
-		walkActive[player] = nil
-
-		-- Stop walking, and square up. A fighter that arrives facing the wrong
-		-- way punches past the bag.
-		humanoid:MoveTo(humanoid.RootPart and humanoid.RootPart.Position or Vector3.zero)
-
-		if facing and mini.PrimaryPart then
+		-- Square up on arrival. A fighter facing the wrong way punches past the
+		-- bag it was sent to hit.
+		if facing and mini.PrimaryPart and not agent:isWalking() then
 			local root = mini.PrimaryPart
 			root.CFrame = CFrame.lookAt(
 				root.Position,
@@ -206,23 +188,6 @@ local function applyAction(player: Player, mini: Model?)
 	-- never disagree with the fists on screen, however long the session runs.
 	mini:SetAttribute("AttackRate", action.rate)
 
-	-- The route, as numbered attributes rather than one list, because attributes
-	-- cannot hold a table and this replicates to every client for free -- the
-	-- same reason the rest of the action is published this way. The client walks
-	-- them in order; the server does not care how fast it gets through them,
-	-- because the punch clock was already set from the route's total length.
-	local route = action.route
-	local previous = mini:GetAttribute("RouteCount") or 0
-
-	for index = 1, math.max(previous, route and #route or 0) do
-		mini:SetAttribute(
-			`RoutePoint{index}`,
-			route and route[index] or nil
-		)
-	end
-
-	mini:SetAttribute("RouteCount", route and #route or nil)
-
 	-- Set last: the client reads the others when this changes.
 	mini:SetAttribute("ActionState", action.state)
 
@@ -232,28 +197,23 @@ local function applyAction(player: Player, mini: Model?)
 	if action.state == "Follow" then
 		-- Following tracks a moving target, so it is stepped continuously
 		-- rather than walked once. Cancel whatever journey was under way.
-		walkGenerations[player] = (walkGenerations[player] or 0) + 1
-		walkDestinations[player] = nil
+		driveTo(player, mini, nil)
 		return
 	end
 
-	if action.route then
-		driveRoute(player, mini, action.route, action.cframe)
-		return
-	end
-
-	-- No route with this order. If a walk is already under way to the same
-	-- place, it is still the right walk -- leave it alone. This is the
-	-- between-floors case: the tower re-issues Fighting for every floor while
-	-- the Mini is still crossing the bridge to get there.
-	local heading = walkDestinations[player]
 	local spot = action.cframe
+
+	-- If a walk to the SAME place is already under way, it is still the right
+	-- walk -- leave it running. This is the between-floors case: the tower
+	-- re-issues Fighting for every floor, and restarting the journey each time
+	-- left the Mini fighting the whole run from inside its own dojo.
+	local heading = walkDestinations[player]
 
 	if spot and heading and (heading - spot.Position).Magnitude < WALK_ARRIVE_RADIUS then
 		return
 	end
 
-	driveRoute(player, mini, if spot then { spot.Position } else nil, spot)
+	driveTo(player, mini, spot and spot.Position or nil, spot)
 end
 
 -- Growth is applied to the model rather than baked into the avatar build, so a
@@ -657,10 +617,12 @@ end
 return points
 end
 
--- How long the Mini needs before the first punch can land. Measured along the
--- ROUTE rather than assumed, so calling it back from across the map and then
--- sending it to train does not have it shadow-boxing on the way.
-local function walkSecondsFor(player: Player, route: { Vector3 }): number
+-- How long before the first punch can land: how long the walk there takes.
+-- Measured along the real route rather than the crow's flight, because the map
+-- is a dojo, a bridge and an arena strung out over a hundred studs and the two
+-- differ by a factor of two. Server and client both hang the punch clock off
+-- this, so the first fist lands exactly when the fighter arrives.
+local function walkSecondsTo(player: Player, destination: Vector3): number
 local from = currentAnchor(player)
 
 if not from then
@@ -670,7 +632,7 @@ end
 local distance = 0
 local previous = from
 
-for _, point in route do
+for _, point in routeTo(player, destination) do
 distance += (point - previous).Magnitude
 previous = point
 end
@@ -694,16 +656,13 @@ warn(`[MiniService] no training spot for {player.Name}; staying in Follow`)
 return false
 end
 
-local route = routeTo(player, spot.Position)
-
 actions[player] = {
 state = "Training",
 cframe = spot,
-route = route,
 rate = MiniConfig.BaseStats.AttacksPerSecond,
 
 -- The first punch cannot land until the Mini has walked to the bag.
-epoch = Workspace:GetServerTimeNow() + walkSecondsFor(player, route),
+epoch = Workspace:GetServerTimeNow() + walkSecondsTo(player, spot.Position),
 }
 applyAction(player, minis[player])
 
@@ -742,13 +701,11 @@ end
 function MiniService.enterFighting(player: Player, spot: CFrame, settleSeconds: number?)
 -- Between floors the Mini is already standing on the mark, so there is no
 -- route to walk and no reason to pay for one.
-local route = if settleSeconds then nil else routeTo(player, spot.Position)
-local delay = settleSeconds or walkSecondsFor(player, route)
+local delay = settleSeconds or walkSecondsTo(player, spot.Position)
 
 actions[player] = {
 state = "Fighting",
 cframe = spot,
-route = route,
 rate = MiniConfig.BaseStats.AttacksPerSecond,
 epoch = Workspace:GetServerTimeNow() + delay,
 }
@@ -760,20 +717,15 @@ end
 function MiniService.enterReturning(player: Player)
 local spot = spotForState(player, "Training")
 
-actions[player] = {
-state = "Returning",
-cframe = spot,
--- The long walk home from the Colyseum, over the bridge, the same way it
--- came. This is the trip the player watches after a loss.
-route = if spot then routeTo(player, spot.Position) else nil,
-}
+actions[player] = { state = "Returning", cframe = spot }
 applyAction(player, minis[player])
 end
 
 -- True while the Mini is still walking somewhere it was sent. Used instead of a
 -- fixed delay by anything that has to happen ON ARRIVAL.
 function MiniService.isWalking(player: Player): boolean
-return walkActive[player] ~= nil
+local agent = agents[player]
+return agent ~= nil and agent:isWalking()
 end
 
 function MiniService.getAction(player: Player): string
@@ -797,7 +749,7 @@ end
 --
 -- Following chases a target that keeps moving, and wandering has no destination
 -- at all until it picks one. Both are stepped rather than walked once, so they
--- live here instead of going through driveRoute.
+-- live here instead of going through the path agent.
 
 -- Where the Mini is loitering next, per player, and until when.
 local wanderSpots: { [Player]: { point: Vector3, until_: number } } = {}

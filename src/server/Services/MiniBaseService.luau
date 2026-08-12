@@ -304,46 +304,29 @@ local function buildArena(base: Model, plate: BasePart): boolean
 		return false
 	end
 
-	arena:SetAttribute("FloorY", floorY)
-	arena:SetAttribute("FloorRadius", radius)
+	-- The model is one solid bowl with no doorway cut into it, so a physical
+	-- fighter can neither walk onto its sand nor off it again. Ramps and raised
+	-- floors were tried and every one of them had an edge the Mini caught on.
+	--
+	-- The simple answer is to stop making it climb: sink the building until its
+	-- sand is FLUSH with the plate, and let the seating rise around it. Then the
+	-- arena floor is just the ground, the Mini walks straight in across the
+	-- flat, and the mesh is pure scenery -- non-colliding, so the stands cannot
+	-- block it either. No ramp, no plinth, no lip to trip over.
+	local plateTop = surfaceY(plate)
+	local drop = floorY - plateTop
 
-	-- The model is one solid mesh with no doorway cut into it, so a physical
-	-- fighter cannot get onto the sand: it walks up to the outer wall and stops
-	-- dead. Until the mesh has a gate, the building is scenery and the walkable
-	-- parts are invisible -- a floor to stand on and a ramp to climb in by, both
-	-- placed from the measurements above so they follow the model.
+	arena:PivotTo(arena:GetPivot() - Vector3.new(0, drop, 0))
+	floorY = plateTop
+
 	for _, descendant in arena:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.CanCollide = false
 		end
 	end
 
-	local sand = makePart(
-		"ArenaFloor",
-		Vector3.new(0.4, radius * 2, radius * 2),
-		Color3.fromRGB(214, 190, 142),
-		CFrame.new(plate.Position.X, floorY - 0.2, plate.Position.Z)
-			* CFrame.Angles(0, 0, math.rad(90)),
-		base
-	)
-	sand.Shape = Enum.PartType.Cylinder
-	sand.Transparency = 1
-
-	local rise = floorY - surfaceY(plate)
-	local run = math.max(rise * 3, 4)
-
-	local ramp = makePart(
-		"ArenaRamp",
-		Vector3.new(math.max(3, radius), 0.4, math.sqrt(rise * rise + run * run)),
-		Color3.fromRGB(214, 190, 142),
-		CFrame.new(
-			plate.Position.X,
-			surfaceY(plate) + rise * 0.5,
-			plate.Position.Z - radius - run * 0.5
-		) * CFrame.Angles(-math.atan2(rise, run), 0, 0),
-		base
-	)
-	ramp.Transparency = 1
+	arena:SetAttribute("FloorY", floorY)
+	arena:SetAttribute("FloorRadius", radius)
 
 	if GameConfig.DebugLogging then
 		print(string.format(
