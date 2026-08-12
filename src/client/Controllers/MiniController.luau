@@ -59,6 +59,11 @@ punchIndex: number,
 impactPending: boolean,
 
 -- Idling around the dojo, and the legs it does that on.
+-- Studs per second, straight from Humanoid.Running. See the note where it
+-- is used: measuring this from position deltas does not work for a body
+-- whose physics the server owns.
+runSpeed: number,
+
 wanderTarget: Vector3?,
 wanderPauseUntil: number,
 -- What it is looking at while it stands about, and for how long.
@@ -1033,6 +1038,7 @@ working = false,
 punchIndex = -1,
 impactPending = false,
 
+runSpeed = 0,
 wanderTarget = nil,
 wanderPauseUntil = 0,
 wanderLook = nil,
@@ -1182,15 +1188,29 @@ for _, state in states do
 -- which way the bag swings -- is derived from the real body rather than
 -- from a prediction of it.
 local pivot = state.model:GetPivot()
-local moved = pivot.Position - state.position
 
 state.position = pivot.Position
-state.velocity = if dt > 0 then moved / dt else Vector3.zero
 state.forward = safeUnit(horizontal(pivot.LookVector), state.forward)
 
--- Whether it is walking is now a question about the body, not about what
--- we told it to do: it is walking if it is moving.
-local speed = horizontal(state.velocity).Magnitude
+-- How fast it is walking, read off the body's REPLICATED velocity.
+--
+-- Two things that do not work here, both tried and measured. Deriving the
+-- speed from how far the model moved since the last frame reads zero on
+-- most frames, because the server owns this body and its position arrives
+-- about twenty times a second while this loop runs every frame -- the walk
+-- animation stopped and restarted continuously and so never played.
+-- Humanoid.Running, which is what Roblox's own Animate script uses, does
+-- not fire on this machine at all: that signal belongs to whoever simulates
+-- the Humanoid, and that is the server.
+--
+-- Assembly velocity does replicate, and measuring it here against a Mini
+-- walking at 6.66 studs a second reads 6.66.
+local root = state.model.PrimaryPart
+local speed = if root
+then horizontal(root.AssemblyLinearVelocity).Magnitude
+else 0
+
+state.runSpeed = speed
 
 if not state.working and speed > WANDER.AnimateAboveStuds then
 setWalking(state, true, speed)
