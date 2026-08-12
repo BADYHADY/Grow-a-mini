@@ -7,6 +7,7 @@
 -- Movement/personality deliberately comes later. This service only proves the
 -- most important product promise: "that tiny fighter is ME."
 
+local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -46,6 +47,7 @@ state: string,
 cframe: CFrame?,
 rate: number?,
 epoch: number?,
+route: { Vector3 }?,
 },
 } = {}
 
@@ -71,6 +73,23 @@ local function applyAction(player: Player, mini: Model?)
 	-- the clock instead of the events means the Power above the Mini's head can
 	-- never disagree with the fists on screen, however long the session runs.
 	mini:SetAttribute("AttackRate", action.rate)
+
+	-- The route, as numbered attributes rather than one list, because attributes
+	-- cannot hold a table and this replicates to every client for free -- the
+	-- same reason the rest of the action is published this way. The client walks
+	-- them in order; the server does not care how fast it gets through them,
+	-- because the punch clock was already set from the route's total length.
+	local route = action.route
+	local previous = mini:GetAttribute("RouteCount") or 0
+
+	for index = 1, math.max(previous, route and #route or 0) do
+		mini:SetAttribute(
+			`RoutePoint{index}`,
+			route and route[index] or nil
+		)
+	end
+
+	mini:SetAttribute("RouteCount", route and #route or nil)
 
 	-- Set last: the client reads the others when this changes.
 	mini:SetAttribute("ActionState", action.state)
@@ -375,18 +394,103 @@ end
 -- How long the Mini needs before the first punch can land. Measured rather than
 -- assumed, so calling it back from across the plot and then sending it to train
 -- does not have it shadow-boxing on the way.
-local function walkSecondsTo(player: Player, destination: CFrame): number
+-- The route the Mini walks to get somewhere, as a list of points it can travel
+-- between in a straight line. The map is a dojo platform, a bridge and an arena
+-- plate strung out over a hundred studs, so a straight line from the bag to the
+-- Colyseum goes through open air -- the Mini has to be told to use the bridge.
+--
+-- Computed on the server because the route is part of what the Mini is DOING,
+-- not how it is drawn, and because the walk-in time the punch clock depends on
+-- has to be measured against the real distance rather than the crow's flight.
+local function routeTo(player: Player, destination: Vector3): { Vector3 }
+local from = currentAnchor(player)
+
+if not from then
+return { destination }
+end
+
+local growth = MiniService.getGrowth(player)
+local path = PathfindingService:CreatePath({
+-- The agent is a two-stud fighter, not a player. Sizing it as a player
+-- makes every gap look impassable and the path falls back to nothing.
+AgentRadius = 0.6 * growth,
+AgentHeight = 2.2 * growth,
+AgentCanJump = false,
+})
+
+-- The Colyseum is a closed bowl: its seating ring has no doorway cut into it,
+-- so there is no walkable route onto the sand and pathfinding correctly says
+-- NoPath. Route to the arena's edge instead and let the Mini cover the last
+-- few studs in a straight line, the way it steps up onto anything else. The
+-- long walk -- the dojo, the bridge, the plate -- is the part worth pathing.
+local approach = MiniBaseService.getArenaApproach(player, destination) or destination
+
+-- The same wall in reverse: a Mini standing on the sand cannot path OUT of
+-- the arena either, which is how the walk home used to be a teleport. Start
+-- the route at the arena's edge and put that step in front of it.
+local exit = MiniBaseService.getArenaApproach(player, from)
+local ok = pcall(path.ComputeAsync, path, exit or from, approach)
+
+if not ok or path.Status ~= Enum.PathStatus.Success then
+-- No route: walk at it directly rather than refusing to move. A Mini that
+-- stands still because the navmesh has not baked is worse than one that
+-- takes a shortcut.
+return { destination }
+end
+
+local points = {}
+
+for index, waypoint in path:GetWaypoints() do
+-- The first waypoint is where the Mini already is.
+if index > 1 then
+table.insert(points, waypoint.Position)
+end
+end
+
+if #points == 0 then
+return { destination }
+end
+
+-- Finish on the exact spot the caller asked for. Pathfinding snaps its last
+-- waypoint to the navmesh, which is close but not the mark the punch was
+-- measured against -- and when the route stopped at the arena's edge, the
+-- mark is inside the building the route could not enter.
+if approach == destination then
+points[#points] = destination
+else
+table.insert(points, destination)
+end
+
+-- Walk out of the building before walking anywhere else.
+if exit then
+table.insert(points, 1, exit)
+end
+
+return points
+end
+
+-- How long the Mini needs before the first punch can land. Measured along the
+-- ROUTE rather than assumed, so calling it back from across the map and then
+-- sending it to train does not have it shadow-boxing on the way.
+local function walkSecondsFor(player: Player, route: { Vector3 }): number
 local from = currentAnchor(player)
 
 if not from then
 return MiniConfig.Training.WalkInSeconds
 end
 
-local distance = (destination.Position - from).Magnitude
+local distance = 0
+local previous = from
+
+for _, point in route do
+distance += (point - previous).Magnitude
+previous = point
+end
+
 local travel = distance / MiniConfig.Wander.TravelSpeedStuds
 
 -- A beat on top for turning and settling onto the mark.
-return math.clamp(travel + 0.4, 0.6, 12)
+return math.clamp(travel + 0.4, 0.6, 40)
 end
 
 --[[ Action state ]]
@@ -402,13 +506,16 @@ warn(`[MiniService] no training spot for {player.Name}; staying in Follow`)
 return false
 end
 
+local route = routeTo(player, spot.Position)
+
 actions[player] = {
 state = "Training",
 cframe = spot,
+route = route,
 rate = MiniConfig.BaseStats.AttacksPerSecond,
 
 -- The first punch cannot land until the Mini has walked to the bag.
-epoch = Workspace:GetServerTimeNow() + walkSecondsTo(player, spot),
+epoch = Workspace:GetServerTimeNow() + walkSecondsFor(player, route),
 }
 applyAction(player, minis[player])
 
@@ -445,11 +552,15 @@ end
 -- `settleSeconds` is the pause between floors; the walk out to the pit is
 -- measured from wherever the Mini currently is.
 function MiniService.enterFighting(player: Player, spot: CFrame, settleSeconds: number?)
-local delay = settleSeconds or walkSecondsTo(player, spot)
+-- Between floors the Mini is already standing on the mark, so there is no
+-- route to walk and no reason to pay for one.
+local route = if settleSeconds then nil else routeTo(player, spot.Position)
+local delay = settleSeconds or walkSecondsFor(player, route)
 
 actions[player] = {
 state = "Fighting",
 cframe = spot,
+route = route,
 rate = MiniConfig.BaseStats.AttacksPerSecond,
 epoch = Workspace:GetServerTimeNow() + delay,
 }
@@ -461,7 +572,13 @@ end
 function MiniService.enterReturning(player: Player)
 local spot = spotForState(player, "Training")
 
-actions[player] = { state = "Returning", cframe = spot }
+actions[player] = {
+state = "Returning",
+cframe = spot,
+-- The long walk home from the Colyseum, over the bridge, the same way it
+-- came. This is the trip the player watches after a loss.
+route = if spot then routeTo(player, spot.Position) else nil,
+}
 applyAction(player, minis[player])
 end
 

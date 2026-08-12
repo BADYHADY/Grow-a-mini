@@ -64,6 +64,14 @@ wanderPauseUntil: number,
 -- What it is looking at while it stands about, and for how long.
 wanderLook: Vector3?,
 wanderLookUntil: number,
+
+-- Progress along the server's route. The signature is what tells us the
+-- server issued a NEW route rather than the same one again.
+routeIndex: number,
+routeSignature: string?,
+-- True while there are waypoints still to walk, which is what stops the
+-- long-distance snap-back from firing mid-journey.
+followingRoute: boolean,
 walkTrack: AnimationTrack?,
 walkPlaying: boolean,
 
@@ -1029,6 +1037,9 @@ wanderTarget = nil,
 wanderPauseUntil = 0,
 wanderLook = nil,
 wanderLookUntil = 0,
+routeIndex = 1,
+routeSignature = nil,
+followingRoute = false,
 walkTrack = nil,
 walkPlaying = false,
 
@@ -1163,6 +1174,11 @@ Training = true,
 Fighting = true,
 }
 
+-- How close counts as having passed a waypoint. Loose on purpose: waypoints are
+-- corners to round, not marks to hit, and the arrival easing would have the Mini
+-- braking to a crawl at every one of them.
+local ROUTE_WAYPOINT_RADIUS = 1.6
+
 
 -- The floor the Mini is allowed to roam, measured off the real dojo by
 -- MiniBaseService and published on the base. Falls back to a small circle
@@ -1287,6 +1303,44 @@ end
 state.wanderTarget = nil
 
 
+-- The map is a dojo platform, a bridge and an arena plate strung out over a
+-- hundred studs, so the server sends a ROUTE rather than a destination: walk
+-- to point 1, then 2, then 3. Without it the Mini walks the straight line
+-- from the bag to the Colyseum, which goes through open air.
+local count = model:GetAttribute("RouteCount")
+
+-- Any live route means the Mini is on a journey the server planned, however
+-- long. That is what holds off the snap-back -- including on the final leg,
+-- which is the 24-stud walk in over the sand, and including a one-point
+-- route, which is what a failed path falls back to.
+state.followingRoute = type(count) == "number" and count > 0
+
+if type(count) == "number" and count > 0 then
+-- Restart the route whenever the server issues a new one.
+if state.routeSignature ~= `{action}:{count}:{tostring(spot.Position)}` then
+state.routeSignature = `{action}:{count}:{tostring(spot.Position)}`
+state.routeIndex = 1
+end
+
+while state.routeIndex < count do
+local leg = model:GetAttribute(`RoutePoint{state.routeIndex}`)
+
+if typeof(leg) ~= "Vector3" then
+break
+end
+
+-- Waypoints are only markers to pass near, not marks to stand on, so
+-- the tolerance is loose. The LAST one is the real spot and is handled
+-- by falling out of this loop.
+if (horizontal(state.position - leg)).Magnitude > ROUTE_WAYPOINT_RADIUS then
+return leg + Vector3.new(0, state.groundOffset, 0), nil
+end
+
+state.routeIndex += 1
+end
+end
+
+
 -- The server hands us a point ON the floor, while the Mini is positioned by
 -- its pivot. Same convention the ground raycast uses.
 return spot.Position
@@ -1373,8 +1427,13 @@ state.impactPending = false
 end
 
 
-if distance
->= MiniConfig.TeleportDistanceStuds
+-- The snap-back exists for a Mini that has fallen impossibly far behind its
+-- owner. It must NOT fire while the Mini is walking a route the server gave
+-- it: the map is over a hundred studs end to end, so the trip to the
+-- Colyseum is legitimately further than this, and snapping would blink the
+-- fighter to the arena instead of letting the player watch it walk there.
+if distance >= MiniConfig.TeleportDistanceStuds
+and not state.followingRoute
 then
 state.position = desired
 state.velocity = Vector3.zero

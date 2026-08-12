@@ -714,6 +714,39 @@ function MiniBaseService.getPitSpots(player: Player, reach: number?): (CFrame?, 
 	return CFrame.lookAt(fighter, enemy), CFrame.lookAt(enemy, fighter)
 end
 
+-- Where a Mini heading INTO the Colyseum should walk to first: on the plate,
+-- just outside the building, on the side the bridge arrives from.
+--
+-- The arena model is a closed bowl -- its seating has no doorway, so nothing can
+-- path onto the sand. Rather than pretend otherwise, callers path to here and
+-- cover the last stretch in a straight line. Returns nil when the destination is
+-- not inside the arena, so ordinary walks are unaffected.
+function MiniBaseService.getArenaApproach(player: Player, destination: Vector3): Vector3?
+	local base = bases[player]
+	local arena = base and base:FindFirstChild("Arena")
+	local plate = base and mapPart(base, "ArenaPlate")
+
+	if not arena or not plate then
+		return nil
+	end
+
+	local _, size = arena:GetBoundingBox()
+	local centre = arena:GetPivot().Position
+	local flat = Vector3.new(destination.X - centre.X, 0, destination.Z - centre.Z)
+	local outerRadius = math.max(size.X, size.Z) * 0.5
+
+	if flat.Magnitude > outerRadius then
+		return nil
+	end
+
+	-- A stride clear of the outer wall, on the bridge side (-Z).
+	return Vector3.new(
+		centre.X,
+		surfaceY(plate) + 0.5,
+		centre.Z - outerRadius - 2.0
+	)
+end
+
 function MiniBaseService.getBagModel(player: Player): Model?
 	local base = bases[player]
 	return base and base:FindFirstChild("Punchingbag") or nil
