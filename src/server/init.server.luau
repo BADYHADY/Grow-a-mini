@@ -18,6 +18,9 @@ local LOAD_ORDER = {
 	"MiniAvatarService",
 	"MiniBaseService",
 	"MiniService",
+	"TrainingService",
+	"TowerService",
+	"MiniCommandService",
 }
 
 local registry = {}

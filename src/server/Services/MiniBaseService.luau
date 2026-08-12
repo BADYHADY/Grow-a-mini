@@ -37,9 +37,17 @@ local CONFIG = {
 	SlotsPerRow = 5,
 	MaxSlots = 20,
 
-	-- The plot carries a full-size player walking around a Mini-size dojo, so
-	-- it is sized for the player even though everything on it is not.
-	PlotSize = Vector3.new(14, 1, 14),
+	-- The plot carries a full-size player walking around a Mini-size dojo AND a
+	-- Mini-size pit, so it is sized for the player even though everything
+	-- standing on it is not. Wide rather than deep: the two halves of the loop
+	-- sit side by side, both visible from where the player spawns.
+	PlotSize = Vector3.new(22, 1, 14),
+
+	-- Dojo on the left, pit on the right. The Mini's whole life is a walk
+	-- between these two points.
+	DojoOffsetX = -4.0,
+	PitOffsetX = 6.0,
+	PitRadius = 2.4,
 	PlotColor = Color3.fromRGB(58, 62, 72),
 	TrimColor = Color3.fromRGB(196, 148, 100),
 
@@ -48,6 +56,12 @@ local CONFIG = {
 	-- against the full-size model and shrink with it.
 	BagOffsetZ = 4.0 * MINI_SCALE,
 	TrainingOffsetZ = 1.4 * MINI_SCALE,
+	-- How far in front of the BAG BODY the Mini stands to punch it. Measured
+	-- against the bag itself rather than the stand, because the bag hangs off
+	-- one side of its frame and a Mini aimed at the frame punches thin air.
+	-- Tuned by measuring the Mini's actual reach at full extension against the
+	-- bag's radius in-game: close enough that the fist presses into the bag.
+	StandOffFromBagZ = 1.70 * MINI_SCALE,
 	SignOffsetZ = -8.0 * MINI_SCALE,
 
 	-- The player is NOT scaled, so their standing spot and the sign height are
@@ -56,7 +70,12 @@ local CONFIG = {
 	SignClearance = 2.4,
 }
 
+local Signal = require(Shared.Util.Signal)
+
 local MiniBaseService = {}
+
+-- (player, base) -- fired once per base, after every prop exists on it.
+MiniBaseService.BaseCreated = Signal.new()
 
 local AnalyticsService
 
@@ -154,6 +173,80 @@ local function makePart(name: string, size: Vector3, color: Color3, cframe: CFra
 	return part
 end
 
+-- The pit is where training gets spent. Deliberately a bare ring on the same
+-- plot rather than a separate world: the player has to be able to watch the Mini
+-- walk from the bag to the fight and back without moving the camera.
+local function buildPit(base: Model, origin: CFrame)
+	local floor = makePart(
+		"Pit",
+		Vector3.new(CONFIG.PitRadius * 2, 0.4, CONFIG.PitRadius * 2),
+		Color3.fromRGB(122, 48, 46),
+		origin * CFrame.new(CONFIG.PitOffsetX, CONFIG.PlotSize.Y + 0.2, 0),
+		base
+	)
+	floor.Shape = Enum.PartType.Cylinder
+	-- A cylinder part's flat faces point along X, so it has to be tipped to lie
+	-- down as a floor.
+	floor.CFrame = floor.CFrame * CFrame.Angles(0, 0, math.rad(90))
+	floor.Material = Enum.Material.Sand
+
+	local rim = makePart(
+		"PitRim",
+		Vector3.new(CONFIG.PitRadius * 2 + 0.8, 0.25, CONFIG.PitRadius * 2 + 0.8),
+		Color3.fromRGB(58, 62, 72),
+		origin * CFrame.new(CONFIG.PitOffsetX, CONFIG.PlotSize.Y + 0.08, 0),
+		base
+	)
+	rim.Shape = Enum.PartType.Cylinder
+	rim.CFrame = rim.CFrame * CFrame.Angles(0, 0, math.rad(90))
+
+	-- The post the player walks up to and presses. TowerService fills in the
+	-- text and does the work; the base only owns the furniture.
+	local post = makePart(
+		"TowerPost",
+		Vector3.new(0.8, 3.2, 0.8),
+		Color3.fromRGB(38, 40, 48),
+		origin * CFrame.new(
+			CONFIG.PitOffsetX,
+			CONFIG.PlotSize.Y + 1.6,
+			-(CONFIG.PitRadius + 1.4)
+		),
+		base
+	)
+	post.Material = Enum.Material.Metal
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "TowerPrompt"
+	prompt.ObjectText = "TOWER"
+	prompt.ActionText = "SEND MINI"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = post
+end
+
+-- Where the coins go. Stands beside the dojo opening so the upgrade is read in
+-- the same glance as the thing it upgrades.
+local function buildBagPost(base: Model, origin: CFrame)
+	local post = makePart(
+		"BagPost",
+		Vector3.new(0.8, 3.0, 0.8),
+		Color3.fromRGB(196, 148, 100),
+		origin * CFrame.new(CONFIG.DojoOffsetX - 3.2, CONFIG.PlotSize.Y + 1.5, -3.0),
+		base
+	)
+	post.Material = Enum.Material.WoodPlanks
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "BagPrompt"
+	prompt.ObjectText = "PUNCHING BAG"
+	prompt.ActionText = "UPGRADE"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = post
+end
+
 local function buildSign(player: Player, base: Model, origin: CFrame)
 	local height = CONFIG.PlotSize.Y + metrics.dojoHeight + CONFIG.SignClearance
 
@@ -235,14 +328,22 @@ local function buildBase(player: Player, slot: number): Model
 
 	local dojo = dojoTemplate:Clone()
 	dojo.Name = "Dojo"
-	dojo:PivotTo(origin * CFrame.new(0, plotTop + metrics.dojoPivotToBottom, 0))
+	dojo:PivotTo(
+		origin * CFrame.new(CONFIG.DojoOffsetX, plotTop + metrics.dojoPivotToBottom, 0)
+	)
 	dojo.Parent = base
 
 	local bag = bagTemplate:Clone()
 	bag.Name = "Punchingbag"
-	bag:PivotTo(origin * CFrame.new(0, interiorFloorY() + metrics.bagPivotToBottom, CONFIG.BagOffsetZ))
+	bag:PivotTo(origin * CFrame.new(
+		CONFIG.DojoOffsetX,
+		interiorFloorY() + metrics.bagPivotToBottom,
+		CONFIG.BagOffsetZ
+	))
 	bag.Parent = base
 
+	buildPit(base, origin)
+	buildBagPost(base, origin)
 	buildSign(player, base, origin)
 
 	base.Parent = basesFolder
@@ -274,6 +375,11 @@ local function ensureBase(player: Player): Model?
 	local base = buildBase(player, slot)
 	bases[player] = base
 
+	-- Services that own behaviour on the furniture (the tower prompt, the
+	-- upgrade prompt) hook themselves up here rather than the base service
+	-- knowing what any of its props are for.
+	MiniBaseService.BaseCreated:Fire(player, base)
+
 	if GameConfig.DebugLogging then
 		print(`[MiniBaseService] Mini Base created for {player.Name} in slot {slot}`)
 	end
@@ -302,9 +408,17 @@ local function placePlayerAtBase(player: Player, character: Model)
 	end
 
 	local origin = slotCFrame(base:GetAttribute("Slot"))
-	local target = origin * CFrame.new(0, CONFIG.PlotSize.Y + 3, CONFIG.PlayerSpawnOffsetZ)
+	local target = origin * CFrame.new(
+		CONFIG.DojoOffsetX,
+		CONFIG.PlotSize.Y + 3,
+		CONFIG.PlayerSpawnOffsetZ
+	)
 	-- Face into the dojo, so the first thing on screen is the thing that matters.
-	local lookAt = (origin * CFrame.new(0, CONFIG.PlotSize.Y + 3, CONFIG.BagOffsetZ)).Position
+	local lookAt = (origin * CFrame.new(
+		CONFIG.DojoOffsetX,
+		CONFIG.PlotSize.Y + 3,
+		CONFIG.BagOffsetZ
+	)).Position
 	local facing = CFrame.lookAt(target.Position, lookAt)
 
 	for attempt = 1, 6 do
@@ -349,7 +463,10 @@ end
 -- Where the Mini stands to train: on the dojo floor, in front of the bag,
 -- facing it. Derived from the same measurements as the bag placement so the
 -- two cannot drift apart when the layout is tuned.
-function MiniBaseService.getTrainingCFrame(player: Player): CFrame?
+-- `reach` is the Mini's current size relative to base scale. A Mini that has
+-- grown has longer arms, so it has to stand proportionally further back or its
+-- fist ends up inside the bag.
+function MiniBaseService.getTrainingCFrame(player: Player, reach: number?): CFrame?
 	local base = bases[player]
 	if not base then
 		return nil
@@ -357,10 +474,37 @@ function MiniBaseService.getTrainingCFrame(player: Player): CFrame?
 
 	local origin = slotCFrame(base:GetAttribute("Slot"))
 	local floorY = interiorFloorY()
-	local spot = (origin * CFrame.new(0, floorY, CONFIG.TrainingOffsetZ)).Position
-	local bagPosition = (origin * CFrame.new(0, floorY, CONFIG.BagOffsetZ)).Position
 
-	return CFrame.lookAt(spot, bagPosition)
+	-- Aim at the part the punch is supposed to land on. Falling back to the
+	-- authored offset keeps the Mini training rather than standing idle if the
+	-- bag model is ever re-exported without a recognisable body part.
+	local body = MiniBaseService.getBagBody(player)
+	local target = body
+		and Vector3.new(body.Position.X, floorY, body.Position.Z)
+		or (origin * CFrame.new(CONFIG.DojoOffsetX, floorY, CONFIG.BagOffsetZ)).Position
+
+	local spot = target - Vector3.new(0, 0, CONFIG.StandOffFromBagZ * (reach or 1))
+
+	return CFrame.lookAt(spot, target)
+end
+
+-- Where the Mini stands to fight, and where its opponent stands facing it. Both
+-- derived from the same pit so a re-tuned layout moves them together.
+function MiniBaseService.getPitSpots(player: Player, reach: number?): (CFrame?, CFrame?)
+	local base = bases[player]
+	if not base then
+		return nil, nil
+	end
+
+	local origin = slotCFrame(base:GetAttribute("Slot"))
+	local floorY = CONFIG.PlotSize.Y + 0.4
+	-- Same rule as the bag: a bigger fighter squares up from further away.
+	local gap = CONFIG.PitRadius * 0.45 * (reach or 1)
+
+	local fighter = (origin * CFrame.new(CONFIG.PitOffsetX, floorY, -gap)).Position
+	local enemy = (origin * CFrame.new(CONFIG.PitOffsetX, floorY, gap)).Position
+
+	return CFrame.lookAt(fighter, enemy), CFrame.lookAt(enemy, fighter)
 end
 
 function MiniBaseService.getBagModel(player: Player): Model?

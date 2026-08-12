@@ -12,6 +12,10 @@ local GameConfig = require(Shared.Config.GameConfig)
 local LOAD_ORDER = {
 	"DebugController",
 	"MiniController",
+	"MiniEffectsController",
+	"MiniStatsController",
+	"HudController",
+	"CommandController",
 }
 
 local registry = {}

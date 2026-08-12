@@ -5,7 +5,12 @@
 -- whole game's pacing by changing two numbers, and so nobody has to maintain a
 -- 50-row spreadsheet in Luau.
 
-export type UpgradeId = "MiniDamage" | "AttackSpeed" | "CritChance" | "CoinGain"
+export type UpgradeId =
+	"PunchingBag"
+	| "MiniDamage"
+	| "AttackSpeed"
+	| "CritChance"
+	| "CoinGain"
 
 export type Upgrade = {
 	Id: UpgradeId,
@@ -24,6 +29,20 @@ export type Upgrade = {
 }
 
 local Upgrades: { [UpgradeId]: Upgrade } = {
+	-- The first sink in the game, and the one the tower's coins exist to feed:
+	-- a better bag means every punch is worth more, which means shorter trips
+	-- back from the tower. PerLevel is read as a FRACTION here (+45% per level).
+	PunchingBag = {
+		Id = "PunchingBag",
+		DisplayName = "Punching Bag",
+		Description = "Your Mini gains more from every punch.",
+		MaxLevel = 40,
+		BaseCost = 25,
+		CostGrowth = 1.32,
+		PerLevel = 0.45,
+		VisualBreakpoints = { 5, 15, 30 },
+	},
+
 	MiniDamage = {
 		Id = "MiniDamage",
 		DisplayName = "Mini Damage",
@@ -71,7 +90,8 @@ local Upgrades: { [UpgradeId]: Upgrade } = {
 
 -- Order the shop lists them in. Damage first: it is the one upgrade a new
 -- player understands without reading anything.
-local DisplayOrder: { UpgradeId } = { "MiniDamage", "AttackSpeed", "CritChance", "CoinGain" }
+local DisplayOrder: { UpgradeId } =
+	{ "PunchingBag", "MiniDamage", "AttackSpeed", "CritChance", "CoinGain" }
 
 local UpgradeConfig = {
 	Upgrades = Upgrades,

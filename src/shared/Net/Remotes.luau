@@ -24,6 +24,9 @@ local FOLDER_NAME = "Remotes"
 local DEFINITIONS = {
 	-- Client to server. Intents only: the client asks, the server decides.
 	BuyUpgrade = "ClientToServer",
+	-- "Follow" | "Train" | "Tower" -- the player telling their Mini where to be.
+	-- Intent only: the server decides whether it is allowed and what it means.
+	MiniCommand = "ClientToServer",
 	ActivateAbility = "ClientToServer",
 	RollMutation = "ClientToServer",
 	ClaimOfflineReward = "ClientToServer",

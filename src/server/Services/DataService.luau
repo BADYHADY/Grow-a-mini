@@ -17,9 +17,10 @@ local ProfileStore = require(Shared.Packages.ProfileStore)
 local Signal = require(Shared.Util.Signal)
 local GameConfig = require(Shared.Config.GameConfig)
 local EconomyConfig = require(Shared.Config.EconomyConfig)
+local MiniConfig = require(Shared.Config.MiniConfig)
 
 local STORE_NAME = "PlayerData"
-local CURRENT_SCHEMA_VERSION = 1
+local CURRENT_SCHEMA_VERSION = 3
 
 -- Studio runs against ProfileStore's in-memory mock so iteration never burns
 -- live DataStore budget or corrupts real saves. Note the mock does NOT survive
@@ -40,6 +41,15 @@ local TEMPLATE = {
 	Mini = {
 		Level = 1,
 		Xp = 0,
+		Power = 0,
+		-- A new Mini wakes up weak and trains its way up. Existing profiles are
+		-- migrated to FULL health instead -- see MIGRATIONS[2].
+		Health = math.floor(
+			MiniConfig.BaseStats.Health * MiniConfig.Training.StartingHealthFraction
+		),
+		MaxHealth = MiniConfig.BaseStats.Health,
+		TowerFloor = MiniConfig.Tower.StartFloor,
+		BestFloor = 0,
 		UnlockedMutations = {},
 		ActiveMutation = "",
 	},
@@ -76,6 +86,35 @@ local MIGRATIONS: { [number]: (data: any) -> () } = {
 -- Reconcile runs AFTER migrations and fills the normal V1 defaults.
 [1] = function(_data: any)
 -- No structural transform required for the V1 baseline.
+end,
+
+-- V0.4: training gave the Mini Power and Health. Reconcile fills the new
+-- fields with the template defaults, but a V1 profile has to start at FULL
+-- health rather than at whatever a later balance pass makes the default --
+-- an existing player must never log in to a hurt Mini they never fought with.
+[2] = function(data: any)
+local mini = data.Mini
+
+if type(mini) ~= "table" then
+return
+end
+
+mini.Power = 0
+mini.MaxHealth = MiniConfig.BaseStats.Health
+mini.Health = mini.MaxHealth
+end,
+
+-- V0.5: the tower. Reconcile fills the new floor fields, but say so explicitly
+-- so a profile from before the tower existed cannot start mid-run.
+[3] = function(data: any)
+local mini = data.Mini
+
+if type(mini) ~= "table" then
+return
+end
+
+mini.TowerFloor = MiniConfig.Tower.StartFloor
+mini.BestFloor = 0
 end,
 }
 

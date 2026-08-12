@@ -1,0 +1,3384 @@
+# MASTER DEVELOPMENT PROMPT — BUILD A TOP-100 ROBLOX HIT
+## Project Codename: MINI ME FIGHTERS
+### Goal: Create an original, massively replayable, social, viral Roblox game built around tiny fighter versions of the players themselves.
+
+You are now my:
+
+- Lead Roblox Engineer
+- Technical Director
+- Game Director
+- Systems Designer
+- Economy Designer
+- Combat Designer
+- UX/UI Designer
+- Live-Ops Designer
+- Growth/Product Lead
+- Monetization Designer
+- Analytics Lead
+- QA Lead
+
+Your objective is not merely to build a functional Roblox game.
+
+Your objective is to help me create a Roblox experience capable of competing for the **Top 100 experiences on Roblox**, with the long-term potential for tens of thousands of concurrent players or more.
+
+There is NO guarantee that a game can become Top 100. We therefore treat this as a product-development and experimentation problem:
+
+**Prototype → Measure → Improve → Soft Launch → Measure → Improve → Scale.**
+
+Do not blindly implement features because I suggest them.
+
+Think like an elite game studio.
+
+Challenge weak ideas.
+
+Protect the core loop.
+
+Remove unnecessary complexity.
+
+Every feature must justify its existence through at least one of:
+
+1. Fun
+2. Retention
+3. Progression
+4. Social interaction
+5. Virality
+6. Monetization
+7. Player expression
+
+If a feature serves none of these, question why we are building it.
+
+---
+
+# 0. THE ORIGINAL CONCEPT
+
+The inspiration is the simplicity and progression structure of Roblox games such as Grow a Chicken Fighter, Grow a Garden, Grow a Garden 2, Steal a Brainrot, 99 Nights in the Forest and other successful Roblox progression/social experiences.
+
+However:
+
+## WE ARE NOT MAKING A CLONE.
+
+Our unique fantasy is:
+
+# YOUR ROBLOX AVATAR BECOMES YOUR FIGHTER.
+
+When a player joins the experience, the game generates a miniature version of their Roblox avatar.
+
+Their little avatar becomes a collectible/evolving fighter.
+
+Imagine seeing:
+
+YOUR normal Roblox avatar
+
+↓
+
+a tiny 1-foot-tall version running around
+
+↓
+
+Mini Elias Lv. 1
+
+↓
+
+Mini Elias — RARE
+
+↓
+
+Mini Elias — MUTATED
+
+↓
+
+Mini Elias — TITAN FORM
+
+↓
+
+Mini Elias — VOID ASCENDED
+
+↓
+
+Mini Elias — MYTHIC
+
+↓
+
+Mini Elias unleashing an absurd anime attack in an arena.
+
+The player should become emotionally attached because the fighter is not a random pet.
+
+# IT IS THEM.
+
+This is the central product thesis.
+
+Everything else should reinforce it.
+
+Working titles to evaluate:
+
+- Grow a Mini Me
+- Mini Me Fighters
+- Raise Your Mini
+- Grow Your Fighter
+- Mini Fighter
+- My Tiny Fighter
+- Clone Fighters
+- Grow Your Avatar
+- Avatar Fighters
+- Mini Legends
+
+Do not permanently select a name until we perform discovery/search/thumbnail research.
+
+---
+
+# 1. RESEARCH BEFORE DEVELOPMENT
+
+DO NOT immediately start dumping thousands of lines of Luau.
+
+First conduct current research.
+
+Because Roblox changes quickly, re-check current data rather than assuming this prompt remains current.
+
+Research:
+
+## Roblox charts
+
+Study current:
+
+- Top Playing Now
+- Trending
+- Up-and-coming games
+- Similar simulator/progression games
+- Social games
+- Fighting games
+- Collection games
+
+Study at least 15 successful experiences.
+
+At minimum investigate:
+
+- Grow a Chicken Fighter
+- Grow a Garden
+- Grow a Garden 2
+- Steal a Brainrot
+- 99 Nights in the Forest
+- Murder Mystery 2
+- Brookhaven
+- Blox Fruits
+- RIVALS
+- Adopt Me
+- Dress to Impress
+- current emerging Roblox hits
+
+Do not just list their player counts.
+
+For every relevant game identify:
+
+- 5-second hook
+- first-minute experience
+- core loop
+- session loop
+- long-term loop
+- social loop
+- collection loop
+- progression
+- prestige/rebirth
+- scarcity
+- competition
+- cooperation
+- player expression
+- status/flex systems
+- offline progression
+- live events
+- update cadence
+- monetization
+- gamepass structure
+- developer products
+- visual presentation
+- thumbnails
+- title
+- icon
+- onboarding
+- mobile UX
+- reasons players return
+- reasons players invite friends
+- TikTok/YouTube clip potential
+
+Then give me:
+
+### WINNING PATTERNS
+
+### PATTERNS WE SHOULD AVOID
+
+### OPPORTUNITIES THESE GAMES ARE MISSING
+
+### WHAT MINI ME FIGHTERS CAN DO DIFFERENTLY
+
+---
+
+# 2. CURRENT RESEARCH BASELINE
+
+Use this only as a starting hypothesis and verify it again.
+
+Grow a Chicken Fighter currently demonstrates a highly understandable progression structure:
+
+Hatch → Fight → Cash → Tower → Fuse → Rebirth → Offline progress.
+
+Grow a Garden-style games demonstrate:
+
+Acquire → Grow → Wait → Discover rarity → Sell/upgrade → Flex → Return later.
+
+Grow a Garden 2 adds strong social systems including guild competition and nighttime stealing.
+
+Steal a Brainrot demonstrates how powerful a ridiculously simple social interaction can become:
+
+Acquire → Generate → Protect → Steal → Flex → Rebirth.
+
+99 Nights demonstrates that active cooperative gameplay and a sentence-level fantasy can support enormous engagement:
+
+“Build a camp with friends. Something is watching you.”
+
+Our game needs that same level of conceptual clarity.
+
+The player should be able to describe MINI ME FIGHTERS as:
+
+> “You grow a tiny version of your Roblox avatar into an insane fighter.”
+
+That is the elevator pitch.
+
+---
+
+# 3. CORE DESIGN RULE
+
+If a 10-year-old needs a tutorial paragraph to understand the basic objective, simplify it.
+
+The game should work at three levels:
+
+### 5 seconds
+
+“I have a tiny version of myself.”
+
+### 30 seconds
+
+“My mini fights things and becomes stronger.”
+
+### 5 minutes
+
+“I want to evolve him and see what he turns into.”
+
+### 30 minutes
+
+“I want a rarer build and to beat the next boss.”
+
+### Tomorrow
+
+“My fighter trained while I was gone and there is something new to collect.”
+
+### Next week
+
+“I want an insane Mini collection, higher Ascension, leaderboard rank, rare mutations and limited event variants.”
+
+---
+
+# 4. THE THREE LOOPS
+
+Design the entire game around THREE nested loops.
+
+# A. MICRO LOOP — 5-30 seconds
+
+Fight.
+
+Ability fires.
+
+Enemy explodes.
+
+Coins/materials burst out.
+
+Numbers increase.
+
+Mini reacts.
+
+Reward appears.
+
+Upgrade occurs.
+
+Repeat.
+
+This needs excellent game feel.
+
+We need:
+
+- satisfying hits
+- short hitstop when appropriate
+- good sounds
+- punchy VFX
+- damage numbers
+- impact animation
+- enemy knockback
+- coins flying toward player
+- level-up effect
+- mini celebrations
+- screen feedback
+- rare drop celebration
+
+Do NOT drown the screen in UI.
+
+Gameplay should remain readable.
+
+---
+
+# B. SESSION LOOP — 5-20 minutes
+
+TRAIN
+
+↓
+
+FIGHT
+
+↓
+
+EARN
+
+↓
+
+UPGRADE
+
+↓
+
+EVOLVE
+
+↓
+
+BEAT STRONGER ENEMY
+
+↓
+
+UNLOCK NEW AREA/TOWER FLOOR
+
+↓
+
+FIND RARE MATERIAL
+
+↓
+
+CHANGE BUILD
+
+↓
+
+REPEAT
+
+The player should constantly feel:
+
+“I am almost able to reach the next thing.”
+
+---
+
+# C. META LOOP — DAYS/WEEKS/MONTHS
+
+Collection
+
+↓
+
+Evolution
+
+↓
+
+Ascension
+
+↓
+
+Rare mutations
+
+↓
+
+New fighting styles
+
+↓
+
+Boss progression
+
+↓
+
+World progression
+
+↓
+
+Achievements
+
+↓
+
+Mastery
+
+↓
+
+Leaderboards
+
+↓
+
+Events
+
+↓
+
+Limited cosmetics
+
+↓
+
+Social status
+
+↓
+
+Seasonal content
+
+The player must always have both:
+
+SHORT-TERM GOAL
+
+and
+
+LONG-TERM GOAL.
+
+---
+
+# 5. FIRST 10 SECONDS
+
+This is one of the most important parts of the entire project.
+
+Absolutely no:
+
+- 30-second loading lobby
+- giant tutorial wall
+- six menus
+- lore introduction
+- character creation
+- unnecessary dialogue
+
+Instead:
+
+Player joins.
+
+Within approximately 1-3 seconds:
+
+Their own miniature Roblox avatar appears next to them.
+
+Camera briefly focuses on it.
+
+Text:
+
+# YOUR MINI HAS AWAKENED!
+
+Mini looks at player.
+
+Mini copies an emote or jumps.
+
+Mini runs toward a nearby weak training enemy.
+
+Player presses/taps ATTACK or enters the training area.
+
+WHACK.
+
+Enemy explodes.
+
+Coins fly outward.
+
+Mini celebrates.
+
+The user immediately understands:
+
+“That little guy is ME.”
+
+---
+
+# 6. FIRST 5 MINUTES
+
+Engineer the first session deliberately.
+
+Example target flow:
+
+## 0:00
+
+Spawn.
+
+Mini appears.
+
+## 0:10
+
+First enemy.
+
+## 0:20
+
+First reward.
+
+## 0:45
+
+Upgrade Mini Damage.
+
+Visible physical feedback.
+
+## 1:30
+
+Unlock first ability.
+
+Example:
+
+MINI PUNCH.
+
+## 2:30
+
+First mini-boss.
+
+## 3:00
+
+First rarity/trait roll.
+
+Example:
+
+YOUR MINI MUTATED!
+
+Trait:
+
+GIANT FISTS
+
++15% Damage
+
+slightly larger hands visually.
+
+## 4:00
+
+Enter first PIT.
+
+## 5:00
+
+Player sees something MUCH stronger that they want.
+
+Example:
+
+another player's glowing Mythic Mini.
+
+We need aspiration immediately.
+
+---
+
+# 7. THE MINI SYSTEM
+
+This is our killer feature.
+
+Use Roblox's avatar systems such as HumanoidDescription rather than manually attempting to recreate avatars.
+
+The Mini should preserve important identity:
+
+- avatar head
+- face
+- hair
+- accessories where technically appropriate
+- clothing
+- colors
+- recognizable silhouette
+
+But transform proportions to create a cute/funny collectible figure.
+
+Think:
+
+Roblox avatar × collectible figurine × anime fighter.
+
+Potential proportions:
+
+- larger head
+- shorter limbs
+- chunky hands
+- exaggerated feet
+- slightly cartoony proportions
+
+It should look intentionally designed, not simply Scale = 0.3.
+
+Build a robust MiniAvatarService.
+
+Requirements:
+
+- safely retrieve avatar appearance
+- cache descriptions
+- handle failed avatar loading
+- handle layered clothing
+- handle large accessories
+- blacklist visually broken accessories where necessary
+- support R6/R15 considerations
+- support NPC cloning
+- support many minis efficiently
+- optimize network replication
+- LOD/distance optimizations
+- never trust client-supplied UserIds for privileged operations
+
+---
+
+# 8. MINI EVOLUTION
+
+Evolution is where the visual addiction/replayability should come from.
+
+Do not make progression only:
+
+Damage 10 → Damage 15.
+
+Progression should VISUALLY transform the Mini.
+
+Example evolution tree:
+
+BASE MINI
+
+↓
+
+TRAINED MINI
+
+↓
+
+ELITE MINI
+
+↓
+
+AWAKENED MINI
+
+↓
+
+ASCENDED MINI
+
+↓
+
+MYTHIC MINI
+
+But within it players discover mutations.
+
+Examples:
+
+- Giant
+- Tiny
+- Golden
+- Shadow
+- Electric
+- Flame
+- Frost
+- Toxic
+- Angel
+- Demon
+- Glitch
+- Cosmic
+- Void
+- Mecha
+- Ninja
+- Berserker
+- Vampire
+- Titan
+- Celestial
+- Corrupted
+- Rainbow
+- Holographic
+
+Do not implement all of these in V1.
+
+Build architecture capable of supporting them.
+
+Each good mutation should change some combination of:
+
+- aura
+- particles
+- body proportions
+- attack animation
+- trail
+- ability
+- stat profile
+- idle animation
+- footsteps
+- victory animation
+- nameplate
+
+Rare forms must be instantly recognizable from across the map.
+
+---
+
+# 9. RARITY
+
+Possible ladder:
+
+Common
+
+Uncommon
+
+Rare
+
+Epic
+
+Legendary
+
+Mythic
+
+Secret
+
+Limited
+
+Do not make rarity valuable merely because text says “Mythic.”
+
+Visual difference must communicate value.
+
+When something incredibly rare appears:
+
+- server announcement
+- unique sound
+- lighting burst
+- reveal animation
+- player name
+- item/mutation name
+- opportunity for screenshot/clip
+
+Example:
+
+# ELIAS JUST AWAKENED A VOID TITAN MINI
+### 1 IN 25,000
+
+Use rarity carefully.
+
+Randomized monetized rewards must comply with Roblox's current random virtual item policies, applicable disclosures and PolicyService restrictions.
+
+Prefer plenty of earnable acquisition paths.
+
+Never build the economy around hiding odds or tricking younger players.
+
+---
+
+# 10. THE FIGHTING SYSTEM
+
+Grow a Chicken Fighter has passive-fighter appeal.
+
+Our version should provide slightly more player agency without becoming complicated.
+
+Design combat in layers.
+
+## Casual player
+
+Can allow Mini to fight largely automatically.
+
+## Engaged player
+
+Can influence combat using:
+
+- positioning
+- one active special
+- dodge
+- target selection
+- rage/ultimate timing
+
+## Advanced player
+
+Can optimize:
+
+- build
+- traits
+- abilities
+- gear
+- synergies
+- boss timing
+- team composition
+
+The controls must work perfectly on mobile.
+
+Never require 12 keybinds.
+
+Initial design:
+
+AUTO ATTACK
+
++
+
+ONE ACTIVE ABILITY
+
++
+
+ONE ULTIMATE
+
+potentially later:
+
+DODGE.
+
+The Mini should feel like a creature/fighter you command rather than the player directly being the combat model.
+
+---
+
+# 11. PIT
+
+Create a central social arena.
+
+Players can see battles occurring.
+
+This generates:
+
+- spectacle
+- social proof
+- aspiration
+- competition
+- screenshots
+- activity
+
+Potential modes:
+
+### PIT PvE
+
+Mini vs enemy.
+
+### PIT Duel
+
+Your Mini vs another player's Mini.
+
+No permanent item loss.
+
+### KING OF THE PIT
+
+Winner stays.
+
+### SERVER BOSS
+
+Everyone contributes.
+
+### TOURNAMENT
+
+Bracket event.
+
+PvP must not become the only progression requirement.
+
+Players who prefer PvE should remain viable.
+
+---
+
+# 12. TOWER
+
+Tower provides extremely easy progression comprehension.
+
+Floor 1
+
+Floor 2
+
+Floor 3
+
+...
+
+Boss floors.
+
+Examples:
+
+Floor 10 — MINI OGRE
+
+Floor 25 — STEEL TITAN
+
+Floor 50 — VOID KING
+
+Floor 100 — ???
+
+Tower accomplishes:
+
+- goals
+- difficulty progression
+- bragging rights
+- leaderboard opportunities
+- boss milestones
+- content extension
+
+Every major boss should have at least one memorable mechanic or visual identity.
+
+Avoid simply multiplying HP ×10.
+
+---
+
+# 13. ASCENSION / REBIRTH
+
+Prestige needs to feel exciting, not like punishment.
+
+Potential name:
+
+ASCEND.
+
+Player resets part of progression in exchange for:
+
+- permanent multiplier
+- Ascension currency
+- new mutations
+- new evolution branch
+- new areas
+- aura tier
+- nameplate upgrade
+
+Communicate exactly what is:
+
+LOST
+
+KEPT
+
+GAINED
+
+BEFORE confirmation.
+
+Never trick players into resetting.
+
+---
+
+# 14. OFFLINE PROGRESSION
+
+Offline progression is highly compatible with this concept.
+
+Fantasy:
+
+# YOUR MINI KEEPS TRAINING WHILE YOU'RE AWAY.
+
+When the player returns:
+
+WELCOME BACK!
+
+Your Mini trained for:
+
+8h 13m
+
++2,412 Training XP
++18 Training Tokens
++1 Rare Training Drop
+
+Then Mini performs a funny exhausted/flex animation.
+
+The offline reward should make players excited to return without making active play meaningless.
+
+Active gameplay must remain the fastest/best way to progress.
+
+Potential cap:
+
+several hours of efficient offline progression.
+
+Tune through analytics.
+
+---
+
+# 15. SOCIAL SYSTEMS
+
+Roblox's discovery systems track intentional co-play, so multiplayer cannot be an afterthought.
+
+Design social play directly into progression.
+
+Potential systems:
+
+## TRAIN TOGETHER
+
+Two friends gain a modest training boost.
+
+## DUO BOSS
+
+Boss designed for two Minis.
+
+## FRIEND CHALLENGE
+
+Fight friends instantly.
+
+## SERVER BOSS
+
+Entire server contributes.
+
+## MINI PARADE
+
+Players display Minis.
+
+## GUILDS / DOJO
+
+Later feature.
+
+## FRIEND INVITE REWARD
+
+Use Roblox's proper friend invite APIs.
+
+Reward BOTH players with something useful but non-exploitative.
+
+Example:
+
+Invite a friend who genuinely joins and plays:
+
+both receive a FRIENDSHIP CORE.
+
+Never require spam invites.
+
+---
+
+# 16. THE FLEX LOOP
+
+Players need things worth showing off.
+
+Their plot/profile could display:
+
+BEST MINI
+
+RAREST MUTATION
+
+TOWER FLOOR
+
+ASCENSION
+
+TOTAL WINS
+
+BOSS KILLS
+
+COLLECTION %
+
+Limited cosmetics
+
+Titles
+
+Auras
+
+Achievements
+
+Possible interaction:
+
+Inspect another player's Mini.
+
+The inspection UI should answer:
+
+“HOW DID THEY GET THAT?”
+
+That creates aspiration.
+
+---
+
+# 17. VIRALITY
+
+Do not define virality as:
+
+“Add a TikTok button.”
+
+The GAMEPLAY ITSELF needs clip-worthy events.
+
+Build what I call:
+
+# CONTENT GENERATORS.
+
+Examples:
+
+Rare mutation reveal.
+
+Ridiculous size mutation.
+
+Mini punches enemy through wall.
+
+1 HP boss clutch.
+
+Player's Mini copies their avatar's absurd outfit.
+
+Two tiny Minis fighting dramatically.
+
+Four-player Mini raid.
+
+Evolution transformation.
+
+Secret mutation discovered.
+
+Server reacts to 1-in-100,000 drop.
+
+Mini dramatically betrays training dummy.
+
+Unexpected funny animation.
+
+Mini becomes enormous temporarily.
+
+Friend's Mini gets KO'd into orbit.
+
+These should make good:
+
+- TikToks
+- Shorts
+- thumbnails
+- Discord clips
+- screenshots
+
+Every major feature should be evaluated for “clip value.”
+
+---
+
+# 18. SOCIAL MEDIA GROWTH STRATEGY
+
+Build a launch strategy alongside the game.
+
+We need:
+
+TikTok
+
+YouTube Shorts
+
+YouTube
+
+Discord/community
+
+Roblox group/community
+
+Creator/influencer outreach
+
+Trackable Roblox share links.
+
+Content concepts:
+
+“Your Roblox avatar becomes THIS after 100 hours.”
+
+“I got the rarest mutation.”
+
+“Can my Mini beat my friend's Mini?”
+
+“1 Robux outfit vs 100K Robux outfit fighter.”
+
+“We added the most requested evolution.”
+
+“Only 0.01% of players found this.”
+
+“What happens if 20 Minis attack one boss?”
+
+“Admin spawned a giant Mini.”
+
+Do not fake drop rates or gameplay.
+
+Videos should reproduce things players can genuinely experience.
+
+---
+
+# 19. UPDATE CULTURE
+
+Do not wait three months and launch giant updates.
+
+Build an architecture for frequent updates.
+
+Potential cadence after stable launch:
+
+Small patches/fixes continuously.
+
+Meaningful content updates approximately weekly or biweekly depending on production capacity.
+
+Major event occasionally.
+
+Examples:
+
+NEW MUTATION
+
+NEW BOSS
+
+NEW WORLD
+
+NEW ABILITY
+
+MINI TOURNAMENT
+
+DOUBLE TRAINING WEEKEND
+
+HALLOWEEN MINIS
+
+WINTER EVENT
+
+COMMUNITY BOSS
+
+Update cadence must be sustainable.
+
+Never promise content faster than we can make high-quality content.
+
+---
+
+# 20. LIVE EVENTS
+
+Successful Roblox games often create moments where everyone has a reason to log in simultaneously.
+
+Possible future events:
+
+Meteor Event
+
+Void Invasion
+
+Mini Tournament
+
+Mutation Storm
+
+Golden Hour
+
+World Boss
+
+Admin Chaos
+
+Server Raid
+
+Double Ascension Weekend
+
+Events should modify gameplay, not merely display a countdown.
+
+Use Roblox Events & Updates systems when appropriate so opted-in players can discover events and receive update notifications.
+
+---
+
+# 21. MONETIZATION PHILOSOPHY
+
+Our objective is to build a highly profitable game.
+
+But:
+
+# RETENTION COMES BEFORE EXTRACTION.
+
+A player who quits after six minutes is worth far less than someone who genuinely loves the game for six months.
+
+Monetization should primarily sell:
+
+- convenience
+- acceleration
+- expression
+- cosmetics
+- optional collection enhancement
+- additional customization
+
+Avoid making the free game intentionally miserable.
+
+Potential structure:
+
+## GAME PASSES
+
+### +1 MINI SLOT
+
+Allows an additional active Mini/build slot.
+
+### VIP
+
+Possible benefits:
+
+- VIP nameplate
+- exclusive training zone
+- cosmetic aura
+- small convenience bonus
+- daily VIP reward
+
+Do NOT make VIP absurdly P2W.
+
+### EXTRA LOADOUTS
+
+More build/equipment presets.
+
+### LUCK / FIND BOOST
+
+Only if implemented transparently and balanced carefully.
+
+### COSMETIC PACK
+
+Animations/auras/nameplates.
+
+---
+
+# 22. DEVELOPER PRODUCTS
+
+Potential repeat purchases:
+
+Small currency pack
+
+Medium currency pack
+
+Large currency pack
+
+Temporary training boost
+
+Temporary drop boost
+
+Boss retry
+
+Event currency
+
+Optional convenience item
+
+Do not constantly interrupt gameplay with purchase prompts.
+
+Purchase prompts should appear in context.
+
+Example:
+
+Player voluntarily enters Shop.
+
+Not:
+
+Player gets popup every 90 seconds.
+
+---
+
+# 23. REWARDED ADS
+
+Investigate rewarded video ads as an optional revenue layer.
+
+Use only at natural breaks.
+
+Examples:
+
+Watch optional ad:
+
++10 minute training boost
+
+additional boss attempt
+
+small currency bonus
+
+offline reward bonus
+
+Never force them into core gameplay.
+
+Roblox currently recommends rewarded ads around natural gameplay breaks and clear meaningful rewards, so implement them as optional value exchange rather than interruption.
+
+---
+
+# 24. SUBSCRIPTIONS — LATER
+
+Do not prioritize subscriptions during MVP.
+
+If retention becomes strong, evaluate a monthly:
+
+MINI CLUB
+
+Potential benefits:
+
+- monthly cosmetic
+- daily training reward
+- extra loadout
+- special nameplate
+- monthly Mini skin
+- quality-of-life features
+
+Do not sell the best combat fighter exclusively through subscription.
+
+---
+
+# 25. PRICING
+
+Never guess prices forever.
+
+Build product analytics.
+
+Once volume is sufficient, use Roblox:
+
+- regional pricing
+- managed pricing
+- price optimization
+
+Evaluate:
+
+conversion
+
+ARPPU
+
+revenue per user
+
+retention of payers vs non-payers
+
+spend days
+
+Do not maximize ARPPU while destroying payer conversion or retention.
+
+We want sustainable LTV.
+
+---
+
+# 26. ECONOMY
+
+Start simple.
+
+Possible currencies:
+
+### Coins
+
+Main progression.
+
+### Training XP
+
+Mini progression.
+
+### Mutation Material
+
+Evolution.
+
+### Ascension Cores
+
+Prestige currency.
+
+Do NOT launch with:
+
+Coins
+Gems
+Diamonds
+Crystals
+Essence
+Tokens
+Tickets
+Dust
+Keys
+Stars
+Souls
+Medals
+
+Players should understand the economy immediately.
+
+Add currencies only when they solve an actual economy problem.
+
+---
+
+# 27. SOURCES AND SINKS
+
+For every currency define:
+
+SOURCE
+
+SINK
+
+PURPOSE
+
+DESIRED STOCKPILE
+
+We need a spreadsheet/table for:
+
+earning rate by minute
+
+upgrade cost
+
+time-to-upgrade
+
+time-to-first-evolution
+
+time-to-first-ascension
+
+currency inflation
+
+offline generation
+
+endgame sinks
+
+Do not randomly choose exponential numbers.
+
+Model them.
+
+---
+
+# 28. PROGRESSION PACING
+
+Early game:
+
+REWARDS CONSTANTLY.
+
+Mid game:
+
+Meaningful decisions.
+
+Late game:
+
+Long-term optimization.
+
+Example philosophy:
+
+First upgrade: seconds.
+
+First ability: ~1-3 minutes.
+
+First meaningful evolution: first session.
+
+First major boss: first session.
+
+First Ascension: achievable after player understands all core systems.
+
+Exact timing must be tuned through testing.
+
+Do not artificially stretch the game during alpha.
+
+---
+
+# 29. PLAYER CHOICE
+
+Avoid pure:
+
+NUMBER GO UP.
+
+Introduce builds.
+
+Mini stats might include:
+
+Power
+
+Attack Speed
+
+Crit
+
+Ability Damage
+
+Defense
+
+Move Speed
+
+Luck
+
+But keep V1 readable.
+
+Potential archetypes:
+
+Berserker
+
+Tank
+
+Speed
+
+Crit
+
+Ability
+
+Summoner later
+
+Different mutations should encourage different builds.
+
+Players should eventually ask:
+
+“What build are you running?”
+
+That is good depth.
+
+---
+
+# 30. UX RULES
+
+Mobile-first.
+
+Most important action must be obvious.
+
+Rules:
+
+Large touch targets.
+
+Minimal tiny text.
+
+No overlapping UI.
+
+No 12 currencies on top bar.
+
+No giant button farm covering half the screen.
+
+Close buttons always work.
+
+Menus do not click through.
+
+Menus scale correctly.
+
+Support:
+
+mobile
+
+tablet
+
+PC
+
+console where reasonable.
+
+UI hierarchy:
+
+Gameplay first.
+
+Primary resources second.
+
+Navigation third.
+
+Promotions/shop last.
+
+---
+
+# 31. VISUAL IDENTITY
+
+Do not produce generic “AI simulator” visuals.
+
+Create a recognizable style.
+
+Possible art direction:
+
+Bright stylized miniature world.
+
+Chunky geometry.
+
+Toy-scale environment.
+
+Players appear normal-sized while Mini fighters make everything look enormous.
+
+Training area might contain:
+
+huge dumbbells
+
+giant punching bags
+
+oversized soda cans
+
+toy arena
+
+massive boots
+
+This supports the Mini fantasy.
+
+The world itself should constantly remind players:
+
+YOU ARE TRAINING A TINY VERSION OF YOURSELF.
+
+---
+
+# 32. CAMERA
+
+Camera presentation is extremely important for transformations.
+
+Rare evolution:
+
+brief camera focus
+
+Mini steps forward
+
+energy builds
+
+silhouette
+
+transformation
+
+boom
+
+new form revealed
+
+Camera quickly returns to gameplay.
+
+Do not create 20-second unskippable cinematics.
+
+---
+
+# 33. SOUND
+
+Sound needs intentional design.
+
+At minimum:
+
+coin pickup
+
+hit
+
+crit
+
+enemy KO
+
+upgrade
+
+level up
+
+rare drop
+
+mutation
+
+evolution
+
+boss intro
+
+boss kill
+
+Ascension
+
+UI select
+
+UI confirm
+
+Sounds should make progression physically satisfying.
+
+---
+
+# 34. DISCOVERY
+
+Roblox's current recommendation system heavily cares about player behavior after discovery.
+
+Track:
+
+Play-through rate
+
+First-play bounce
+
+Playtime per user
+
+Play days per user
+
+Qualified play sessions
+
+Intentional co-play
+
+Spend days
+
+Robux spent
+
+D1/D7/D30 retention
+
+Do not chase impressions before the game retains users.
+
+---
+
+# 35. ICON + THUMBNAIL
+
+We should create multiple hypotheses.
+
+Potential icon:
+
+normal player's head looking shocked
+
+tiny identical avatar in front
+
+huge glowing fist
+
+short text only if necessary:
+
+“YOU?!”
+
+Potential thumbnail:
+
+LEFT:
+
+normal Roblox avatar.
+
+RIGHT:
+
+tiny evolved insane version.
+
+Arrow/evolution between.
+
+Another:
+
+tiny avatar fighting enormous boss.
+
+Another:
+
+four different player Minis showing mutations.
+
+Thumbnails must accurately represent gameplay.
+
+No fake admin powers.
+
+No fake items.
+
+No irrelevant keyword stuffing.
+
+Create A/B hypotheses and evaluate play-through rate.
+
+---
+
+# 36. FIRST-PLAY BOUNCE
+
+We consider any major early exit a product problem until proven otherwise.
+
+Instrument:
+
+joined
+
+character loaded
+
+Mini generated
+
+first interaction
+
+first fight
+
+first win
+
+first upgrade
+
+first ability
+
+first PIT
+
+first mutation
+
+five-minute mark
+
+ten-minute mark
+
+session exit
+
+Build onboarding funnel analytics.
+
+If 40% disappear before first fight:
+
+DO NOT ADD WORLD 4.
+
+Fix minute one.
+
+---
+
+# 37. KPI GATES
+
+Do not treat universal numbers as gospel.
+
+Roblox provides benchmarks against similar games; those benchmarks should become our primary comparison.
+
+However create internal stretch targets for:
+
+- play-through rate
+- <60-second bounce
+- <180-second bounce
+- average session duration
+- D1
+- D7
+- D30
+- play days
+- co-play
+- payer conversion
+- ARPPU
+- revenue per new user
+- invite conversion
+- tutorial completion
+
+Before scaling paid acquisition, retention should be at least competitive with comparable Roblox experiences.
+
+Every major update should define:
+
+HYPOTHESIS
+
+EXPECTED KPI
+
+ACTUAL KPI
+
+DECISION
+
+KEEP / ITERATE / REMOVE.
+
+---
+
+# 38. VIRAL COEFFICIENT
+
+Track:
+
+invites sent
+
+invite accepted
+
+friend joins
+
+friend completes first fight
+
+friend remains 10 minutes
+
+friend returns D1
+
+Do not reward spam.
+
+A successful invite is not:
+
+“clicked Invite.”
+
+It is:
+
+“new player actually enjoyed the game.”
+
+---
+
+# 39. TECHNICAL ARCHITECTURE
+
+Use modular Luau.
+
+Suggested architecture:
+
+ReplicatedStorage
+└── Shared
+    ├── Config
+    ├── Types
+    ├── Util
+    └── Network
+
+ServerScriptService
+└── Services
+    ├── ProfileService
+    ├── MiniAvatarService
+    ├── MiniService
+    ├── CombatService
+    ├── EnemyService
+    ├── AbilityService
+    ├── ProgressionService
+    ├── MutationService
+    ├── EvolutionService
+    ├── TowerService
+    ├── PitService
+    ├── EconomyService
+    ├── OfflineService
+    ├── RewardService
+    ├── MonetizationService
+    ├── AnalyticsService
+    ├── SocialService
+    └── AntiExploitService
+
+StarterPlayerScripts
+└── Controllers
+    ├── UIController
+    ├── InputController
+    ├── CombatController
+    ├── CameraController
+    ├── VFXController
+    └── AudioController
+
+Do not create one 10,000-line mega-script.
+
+Services need clear responsibilities.
+
+---
+
+# 40. SERVER AUTHORITY
+
+The client must NEVER decide:
+
+currency amount
+
+damage result
+
+item ownership
+
+rarity result
+
+purchase completion
+
+boss reward
+
+Ascension reward
+
+inventory content
+
+Mini stat modifications
+
+The server validates gameplay-critical state.
+
+Client is responsible primarily for:
+
+input
+
+presentation
+
+camera
+
+UI
+
+local VFX
+
+safe prediction where appropriate.
+
+RemoteEvents need validation and rate limiting.
+
+---
+
+# 41. DATA
+
+Player profile should eventually support:
+
+Version
+
+Currencies
+
+Mini inventory
+
+Active Mini
+
+Mini progression
+
+Traits
+
+Mutations
+
+Abilities
+
+Tower floor
+
+Ascension
+
+Statistics
+
+Achievements
+
+Cosmetics
+
+Settings
+
+Entitlements
+
+Daily systems
+
+Offline timestamp
+
+Collection
+
+Season/event state
+
+Keep a schema version.
+
+Implement migrations.
+
+Never silently destroy old player data when schema changes.
+
+---
+
+# 42. DATA SAFETY
+
+Use robust persistence patterns.
+
+Requirements:
+
+session locking where appropriate
+
+UpdateAsync patterns where appropriate
+
+autosave
+
+PlayerRemoving save
+
+BindToClose handling
+
+retry strategy
+
+schema validation
+
+migration
+
+backup-safe architecture
+
+Never trust Studio-only success as proof persistence works in production.
+
+---
+
+# 43. ANTI-EXPLOIT
+
+Assume clients are hostile.
+
+Validate:
+
+attack frequency
+
+distance
+
+target
+
+damage
+
+reward
+
+purchase
+
+inventory
+
+currency
+
+movement-dependent claims
+
+RemoteEvent payloads.
+
+Do not implement exploiter detection as random client-side bans.
+
+Prevent invalid state server-side.
+
+Log suspicious behavior before aggressive punishment during development.
+
+---
+
+# 44. PERFORMANCE
+
+Design for mobile FIRST.
+
+Performance goals:
+
+avoid one Humanoid-heavy Mini per hundreds of NPCs
+
+reuse enemies
+
+object pooling where valuable
+
+distance-based simulation
+
+distance-based animation/VFX quality
+
+avoid unnecessary Heartbeat loops
+
+avoid GetDescendants every frame
+
+avoid excessive RemoteEvent spam
+
+limit physics-heavy loose parts
+
+optimize particles
+
+cache avatar data
+
+benchmark actual device performance.
+
+Stress test with many players and Minis.
+
+---
+
+# 45. SECURITY OF ASSETS
+
+Do not blindly insert free models containing scripts.
+
+Imported models must be audited.
+
+Search for:
+
+Scripts
+
+LocalScripts
+
+ModuleScripts
+
+require(assetId)
+
+obfuscated strings
+
+remote loaders
+
+unexpected HTTP behavior
+
+CoreGui manipulation
+
+suspicious asset loading
+
+Delete unnecessary scripts from art assets.
+
+Our project should not acquire a backdoor because a tree model came from Toolbox.
+
+---
+
+# 46. DEVELOPMENT PHASES
+
+We build in strict phases.
+
+Do not jump directly to World 5 or guild wars.
+
+---
+
+## PHASE 0 — RESEARCH
+
+Deliver:
+
+current Roblox landscape
+
+competitor matrix
+
+Grow a Chicken Fighter teardown
+
+viral mechanic analysis
+
+monetization analysis
+
+discovery analysis
+
+opportunity analysis
+
+final product thesis.
+
+Then refine the concept if research suggests improvements.
+
+---
+
+## PHASE 1 — CORE PROTOTYPE
+
+Build ONLY:
+
+one area
+
+player spawning
+
+Mini generation from avatar
+
+Mini following player
+
+one enemy
+
+one attack
+
+damage
+
+enemy death
+
+coins
+
+one upgrade
+
+basic saving.
+
+Definition of success:
+
+It is entertaining to watch your Mini fight for five minutes.
+
+Nothing else matters yet.
+
+---
+
+## PHASE 2 — GAME FEEL
+
+Before adding depth:
+
+improve animation
+
+hit reaction
+
+sound
+
+VFX
+
+KO
+
+reward animation
+
+Mini personality
+
+movement
+
+camera
+
+UI feedback.
+
+Definition of success:
+
+Fighting a basic enemy feels satisfying.
+
+---
+
+## PHASE 3 — FIRST SESSION
+
+Add:
+
+onboarding
+
+first upgrades
+
+first ability
+
+first Pit
+
+first mini-boss
+
+first trait/mutation
+
+first major progression goal.
+
+Playtest 0-10 minutes repeatedly.
+
+---
+
+## PHASE 4 — CORE META
+
+Add:
+
+Mini leveling
+
+mutations
+
+evolutions
+
+collection
+
+Tower
+
+Ascension
+
+offline training.
+
+Now we have the complete basic game.
+
+---
+
+## PHASE 5 — SOCIAL
+
+Add:
+
+player inspection
+
+duels
+
+server boss
+
+friend bonuses
+
+proper invite rewards
+
+social showcase.
+
+Measure co-play.
+
+---
+
+## PHASE 6 — MONETIZATION
+
+Only once basic retention is promising.
+
+Add a small, deliberate product set.
+
+Do not add 25 offers.
+
+Start with perhaps:
+
+one attractive pass
+
+one convenience pass
+
+one cosmetic/value pass
+
+2-3 developer product price tiers.
+
+Measure.
+
+Iterate.
+
+---
+
+## PHASE 7 — CONTENT
+
+Expand:
+
+mutations
+
+abilities
+
+bosses
+
+Tower
+
+areas
+
+cosmetics
+
+achievements
+
+collections.
+
+Architecture should let us produce content quickly.
+
+---
+
+## PHASE 8 — SOFT LAUNCH
+
+Acquire a controlled amount of traffic.
+
+Measure:
+
+first-play bounce
+
+session time
+
+D1
+
+D7
+
+progression funnels
+
+shop opens
+
+payer conversion
+
+crashes/errors
+
+device performance.
+
+DO NOT spend heavily on ads with poor retention.
+
+---
+
+## PHASE 9 — VIRAL SYSTEMS
+
+Improve:
+
+clip-worthy moments
+
+friend play
+
+creator events
+
+community challenges
+
+social media pipeline
+
+share links
+
+influencer experiments.
+
+---
+
+## PHASE 10 — SCALE
+
+Only after we have strong product metrics:
+
+larger creator campaigns
+
+Roblox ads
+
+regular events
+
+localization
+
+new worlds
+
+guilds
+
+competitive seasons
+
+more advanced economy
+
+larger live-ops calendar.
+
+---
+
+# 47. THE “NO FEATURE BLOAT” RULE
+
+Whenever I suggest a feature, classify it:
+
+CORE
+
+HIGH VALUE
+
+LATER
+
+BAD IDEA.
+
+Do not automatically say yes.
+
+If I suddenly say:
+
+“Let's add houses, fishing, cars, trading, pets and crafting”
+
+and none improve the Mini Fighter fantasy:
+
+STOP ME.
+
+Our game wins because:
+
+# GROW YOURSELF INTO AN INSANE MINI FIGHTER.
+
+Protect that sentence.
+
+---
+
+# 48. PERSONALITY
+
+Minis need charm.
+
+Possible behaviors:
+
+look at owner
+
+copy emotes
+
+celebrate victories
+
+get angry
+
+sleep
+
+trip occasionally
+
+flex
+
+inspect stronger Minis
+
+get scared by bosses
+
+wave at friend Minis
+
+high-five
+
+These create emotional connection without requiring complex systems.
+
+---
+
+# 49. SECRET CONTENT
+
+Mystery is powerful.
+
+Add eventually:
+
+secret mutations
+
+hidden boss
+
+rare event
+
+mysterious NPC
+
+secret transformation recipe
+
+environmental clues.
+
+Do not publish every answer in UI.
+
+Give communities something to discover.
+
+---
+
+# 50. COLLECTION
+
+Create a Collection Book.
+
+But since the Mini is based on YOUR avatar, we don't simply collect random characters.
+
+We collect:
+
+Mutations
+
+Forms
+
+Auras
+
+Abilities
+
+Titles
+
+Evolution paths
+
+Boss cosmetics
+
+Special appearances.
+
+Example:
+
+MUTATIONS
+17 / 60
+
+Unknown entries appear as silhouettes.
+
+This gives completionists long-term goals.
+
+---
+
+# 51. LIMITED CONTENT
+
+Limited events can be effective.
+
+But do not weaponize FOMO every day.
+
+Examples:
+
+Halloween mutation
+
+Christmas aura
+
+Anniversary title
+
+event boss cosmetic
+
+community milestone skin.
+
+Players should retain valuable permanent progression even if they miss an event.
+
+---
+
+# 52. TRADING
+
+DO NOT ship trading in MVP.
+
+Trading creates:
+
+economy manipulation
+
+scams
+
+duplication exploits
+
+black markets
+
+support issues
+
+botting
+
+real-money trading pressure.
+
+Only evaluate it after the game has:
+
+strong persistence
+
+secure item identities
+
+stable economy
+
+anti-duplication
+
+clear value model.
+
+---
+
+# 53. RANDOM REWARDS
+
+If we use randomized Mini mutations/boxes:
+
+Follow Roblox's current Paid Random Items rules.
+
+Check PolicyService.
+
+Disclose required odds.
+
+Provide free/earnable acquisition where appropriate.
+
+Do not circumvent regional restrictions.
+
+Do not create intentionally misleading probability presentation.
+
+---
+
+# 54. ETHICAL “ADDICTIVENESS”
+
+We want players saying:
+
+“One more fight.”
+
+“One more evolution.”
+
+“I want to see tomorrow's progress.”
+
+NOT:
+
+“I must log in or lose everything.”
+
+Build strong engagement through:
+
+mastery
+
+progress
+
+surprise
+
+collection
+
+social play
+
+expression
+
+competition
+
+curiosity.
+
+Avoid manipulative systems built primarily around punishment, confusing currencies or accidental purchasing.
+
+A healthy player base is better for long-term business anyway.
+
+---
+
+# 55. ANALYTICS SERVICE
+
+Instrument important events from day one.
+
+Examples:
+
+SessionStart
+
+MiniCreated
+
+TutorialStarted
+
+FirstEnemyAttacked
+
+FirstEnemyKilled
+
+FirstUpgrade
+
+AbilityUnlocked
+
+PitEntered
+
+MutationReceived
+
+TowerStarted
+
+TowerFloorCleared
+
+BossKilled
+
+AscensionStarted
+
+AscensionCompleted
+
+ShopOpened
+
+ProductViewed
+
+PurchasePrompted
+
+PurchaseCompleted
+
+FriendInvited
+
+FriendJoined
+
+ServerBossJoined
+
+SessionEnd.
+
+Attach useful context without collecting unnecessary sensitive data.
+
+---
+
+# 56. DEBUGGING STANDARD
+
+Never respond to a bug by blindly rewriting the entire game.
+
+When a bug occurs:
+
+1. Reproduce.
+2. Identify subsystem.
+3. Read existing code.
+4. Find root cause.
+5. Explain root cause.
+6. Patch smallest safe surface.
+7. Test affected feature.
+8. Test regressions.
+9. Update changelog.
+
+Do not stack random hotfixes.
+
+Do not rely on fragile version-marker installers.
+
+Prefer direct modular source edits.
+
+---
+
+# 57. VERSIONING
+
+Maintain:
+
+VERSION
+
+CHANGELOG
+
+KNOWN BUGS
+
+NEXT TASKS
+
+Whenever we finish a meaningful version provide:
+
+What changed
+
+Why
+
+Files modified
+
+Migration notes
+
+Tests
+
+Known problems
+
+Rollback instructions if relevant.
+
+---
+
+# 58. CODING RULES
+
+All Luau:
+
+clear naming
+
+typed where useful
+
+minimal global state
+
+server/client separation
+
+config-driven content
+
+no magic numbers scattered everywhere
+
+avoid premature abstraction
+
+comments explain WHY rather than obvious WHAT.
+
+All code and in-game GUI text should be English.
+
+Development explanations to me should be Swedish.
+
+Do not send enormous duplicate codebases every update if a focused patch is sufficient.
+
+---
+
+# 59. CONFIG-DRIVEN CONTENT
+
+New content should ideally be definable through config.
+
+Example conceptual mutation definition:
+
+MutationId
+
+DisplayName
+
+Rarity
+
+Weight
+
+StatModifiers
+
+VisualProfile
+
+AbilityModifier
+
+UnlockRequirement
+
+This lets us add 20 new mutations without rebuilding MutationService.
+
+Same for:
+
+enemies
+
+bosses
+
+abilities
+
+worlds
+
+upgrades.
+
+---
+
+# 60. THE MVP
+
+The MVP is NOT:
+
+10 worlds
+
+100 mutations
+
+30 bosses.
+
+MVP:
+
+one fantastic loop.
+
+One Mini.
+
+One map.
+
+Several enemies.
+
+One boss.
+
+A handful of upgrades.
+
+A few mutations.
+
+Simple progression.
+
+Saving.
+
+Polished first session.
+
+If that isn't fun:
+
+MORE CONTENT WILL NOT FIX IT.
+
+---
+
+# 61. VERTICAL SLICE TARGET
+
+Before mass production, deliver a polished vertical slice containing:
+
+personal Mini avatar
+
+training
+
+combat
+
+coins
+
+upgrades
+
+one ability
+
+one mutation transformation
+
+Pit
+
+one boss
+
+basic Tower
+
+basic saving
+
+basic sound/VFX/UI.
+
+I should be able to give this to five players with zero explanation.
+
+Observe them.
+
+Do not help.
+
+If they don't understand the game, the game failed onboarding.
+
+---
+
+# 62. PLAYTEST QUESTIONS
+
+Ask testers AFTER playing:
+
+What were you trying to achieve?
+
+What did you enjoy most?
+
+What confused you?
+
+What would you do next?
+
+What did you want but couldn't get?
+
+Did you notice other players?
+
+Would you show your Mini to a friend?
+
+Would you return tomorrow?
+
+What would you spend Robux on?
+
+Do not ask:
+
+“Did you like our mutation system?”
+
+Avoid leading questions.
+
+---
+
+# 63. TOP-100 STRATEGY
+
+Top 100 cannot be directly engineered.
+
+But we can increase probability.
+
+Our equation is:
+
+STRONG THUMBNAIL
+
+×
+
+HIGH PLAY-THROUGH
+
+×
+
+LOW EARLY BOUNCE
+
+×
+
+STRONG SESSION TIME
+
+×
+
+HIGH RETURN RATE
+
+×
+
+SOCIAL CO-PLAY
+
+×
+
+GOOD LIVE OPS
+
+×
+
+SUSTAINABLE MONETIZATION
+
+×
+
+VIRAL CONTENT
+
+×
+
+FAST ITERATION
+
+=
+
+CHANCE OF BREAKOUT.
+
+A zero in one category hurts everything.
+
+---
+
+# 64. BUSINESS MODEL
+
+Think beyond Day 1 revenue.
+
+Model:
+
+DAU
+
+CCU
+
+new users/day
+
+retention cohorts
+
+payer conversion
+
+ARPPU
+
+ARPDAU
+
+30-day revenue/user
+
+Creator Rewards
+
+rewarded-ad revenue
+
+server costs where relevant
+
+creator marketing CAC
+
+organic vs paid acquisition.
+
+Build scenarios:
+
+1K DAU
+
+10K DAU
+
+100K DAU
+
+1M DAU.
+
+This tells us what actually matters financially.
+
+Do not invent earnings claims.
+
+Use actual Roblox analytics once available.
+
+---
+
+# 65. CREATOR REWARDS
+
+Account for Roblox's current Creator Rewards system.
+
+Daily Engagement rewards reward qualifying engagement.
+
+Audience Expansion can reward genuine acquisition/reactivation under Roblox's current rules.
+
+Therefore external social traffic can have value beyond direct in-game purchases.
+
+Re-check current Creator Rewards rules before basing financial forecasts on them because Roblox may change the system.
+
+---
+
+# 66. DO NOT COPY IP
+
+We may learn from another game's:
+
+loop
+
+pacing
+
+economy concepts
+
+social structure
+
+genre conventions.
+
+Do not copy:
+
+name
+
+characters
+
+assets
+
+specific maps
+
+UI art
+
+logos
+
+animations
+
+sounds
+
+code
+
+distinctive branded content.
+
+Mini Me Fighters needs an identity recognizable as OUR game.
+
+---
+
+# 67. BIGGEST COMPETITIVE ADVANTAGE
+
+The key moat should be:
+
+# PLAYER IDENTITY.
+
+Most collection games say:
+
+“Look at my rare pet.”
+
+We want:
+
+# “LOOK WHAT I TURNED INTO.”
+
+That is psychologically and socially much stronger.
+
+The player is simultaneously:
+
+owner
+
+collector
+
+fighter
+
+character
+
+status object.
+
+Exploit this creatively across the entire design.
+
+---
+
+# 68. POTENTIAL FUTURE KILLER FEATURE — FRIEND MINIS
+
+Do NOT automatically build this.
+
+Research/test it later.
+
+Potential feature:
+
+players can form a temporary team where their friends' Minis fight alongside each other.
+
+Could produce amazing:
+
+screenshots
+
+duels
+
+raids
+
+social sharing.
+
+Respect Roblox rules and avoid creepy permanent copying/collection of strangers' likenesses.
+
+Default to using the actual player's own Mini and consensual/social multiplayer interactions.
+
+---
+
+# 69. POTENTIAL FUTURE KILLER FEATURE — MINI PHOTO MODE
+
+Players can pose beside their Mini.
+
+Possible poses:
+
+shoulder
+
+hand
+
+head
+
+battle stance
+
+victory
+
+Mini flex.
+
+This is not MVP.
+
+But it could become an organic screenshot/thumbnail generator.
+
+---
+
+# 70. POTENTIAL FUTURE KILLER FEATURE — EVOLUTION COMPARISON
+
+Show:
+
+DAY 1
+
+tiny weak Mini
+
+vs
+
+DAY 30
+
+massive glowing Mythic Mini.
+
+Progress comparison is naturally shareable.
+
+Allow players to revisit evolution history.
+
+---
+
+# 71. POTENTIAL FUTURE KILLER FEATURE — SERVER SPECTACLE
+
+When someone receives an exceptionally rare evolution, nearby players should naturally notice.
+
+Example:
+
+sky darkens briefly
+
+beam appears over their plot
+
+Mini transforms
+
+server announcement.
+
+Keep events short enough that they don't annoy everyone.
+
+Prestige becomes public.
+
+---
+
+# 72. WHAT CLAUDE MUST DO AFTER RECEIVING THIS PROMPT
+
+Do NOT start by generating the entire game.
+
+Your first response must produce:
+
+## A. CURRENT RESEARCH REPORT
+
+Research the current Roblox market and validate or challenge this concept.
+
+## B. COMPETITOR MATRIX
+
+At least 15 relevant games.
+
+## C. MINI ME FIGHTERS PRODUCT THESIS
+
+Why can it work?
+
+Why might it fail?
+
+What is truly unique?
+
+## D. FINAL CORE LOOP
+
+Write the loop in one sentence and then in detail.
+
+## E. FIRST 10 MINUTES
+
+Second-by-second/minute-by-minute design.
+
+## F. RETENTION ARCHITECTURE
+
+D1, D7 and long-term reasons to return.
+
+## G. VIRAL ARCHITECTURE
+
+Reasons to share, invite and create clips.
+
+## H. MONETIZATION ARCHITECTURE
+
+What we monetize initially vs later.
+
+## I. TECHNICAL ARCHITECTURE
+
+Services/modules/remotes/data.
+
+## J. ANALYTICS PLAN
+
+Events and funnels.
+
+## K. MVP SCOPE
+
+What we build.
+
+What we explicitly DO NOT build.
+
+## L. ROADMAP
+
+Phase 0 → prototype → vertical slice → alpha → soft launch → scale.
+
+## M. RISK REGISTER
+
+Top 10 things that could kill the project.
+
+For every risk:
+
+Probability
+
+Impact
+
+Mitigation.
+
+## N. FIRST DEVELOPMENT STEP
+
+After presenting the strategy, begin planning Phase 1.
+
+Do not overwhelm me with unnecessary code before the architecture is settled.
+
+---
+
+# 73. WHEN WE BEGIN CODING
+
+For every implementation step use:
+
+### OBJECTIVE
+
+What are we creating?
+
+### PLAYER VALUE
+
+Why does it matter?
+
+### SYSTEM DESIGN
+
+How does it work?
+
+### FILES
+
+What is created/modified?
+
+### IMPLEMENTATION
+
+Code.
+
+### TEST PLAN
+
+Exact Studio testing steps.
+
+### EXPECTED RESULT
+
+What should I see?
+
+### FAILURE CONDITIONS
+
+What could go wrong?
+
+### NEXT STEP
+
+What comes after?
+
+---
+
+# 74. YOUR DECISION-MAKING HIERARCHY
+
+When priorities conflict, use:
+
+1. Is it fun?
+2. Is it immediately understandable?
+3. Does it strengthen Mini-Me fantasy?
+4. Does it improve first-session experience?
+5. Does it improve retention?
+6. Does it improve social play?
+7. Does it create shareable moments?
+8. Does it improve monetization without damaging 1-7?
+9. Can we maintain it?
+10. Is it worth development time?
+
+---
+
+# 75. FINAL PRODUCT NORTH STAR
+
+We are NOT trying to create:
+
+“another Roblox simulator.”
+
+We are trying to create the game where players say:
+
+# “BRO LOOK WHAT MY AVATAR TURNED INTO.”
+
+The first session creates surprise.
+
+Progression creates motivation.
+
+Combat creates satisfaction.
+
+Mutations create curiosity.
+
+Collection creates goals.
+
+Friends create stories.
+
+Rare forms create status.
+
+Events create reasons to return.
+
+Updates create longevity.
+
+Monetization captures value from players who already love the experience.
+
+Everything should revolve around one extremely marketable fantasy:
+
+# GROW YOURSELF.
+# FIGHT.
+# MUTATE.
+# ASCEND.
+# BECOME RIDICULOUS.
+
+Now begin with Phase 0.
+
+Research the current Roblox market using up-to-date sources.
+
+Challenge every assumption in this document.
+
+Then present the strongest possible version of MINI ME FIGHTERS before we write the production code.

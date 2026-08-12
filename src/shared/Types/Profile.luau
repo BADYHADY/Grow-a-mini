@@ -17,6 +17,17 @@ export type Currencies = {
 export type MiniState = {
 	Level: number,
 	Xp: number,
+	-- Earned by training and never lost. This is the number the player watches
+	-- climb above the Mini's head.
+	Power: number,
+	-- Health is spent in fights and refilled at the punching bag, so it persists:
+	-- a Mini that left the session hurt has to be trained back up.
+	Health: number,
+	MaxHealth: number,
+	-- The floor the current tower run is on. Runs restart from the bottom, so
+	-- this is progress within a run; BestFloor is the number worth bragging about.
+	TowerFloor: number,
+	BestFloor: number,
 	-- Every mutation the player has ever unlocked, for the Collection Book.
 	UnlockedMutations: { string },
 	-- The one currently applied. Empty string means none, rather than nil,

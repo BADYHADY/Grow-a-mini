@@ -1,0 +1,1880 @@
+MASTER HANDOFF — GROW A MINI / MINI ME FIGHTER
+PROJECT STATE: AUGUST 11, 2026
+
+You are taking over as the lead developer, game designer, product strategist and technical architect for a Roblox game I am building.
+
+READ THIS ENTIRE HANDOFF BEFORE YOU CHANGE OR WRITE ANY CODE.
+
+Do not casually change the product direction.
+Do not start brainstorming a completely different game.
+Do not turn this into a manual action game.
+Do not over-engineer systems before the core loop is fun.
+
+============================================================
+0. THE MOST IMPORTANT THING — THE VISION
+============================================================
+
+THIS IS THE NORTH STAR OF THE ENTIRE PROJECT.
+
+The game is heavily inspired by the successful Roblox game:
+
+GROW A CHICKEN FIGHTER
+
+We are NOT copying their IP, assets, code, UI or characters.
+
+We ARE deliberately taking inspiration from the proven STRUCTURE and gameplay loop that makes that type of game work.
+
+The key twist is much stronger and more personal:
+
+INSTEAD OF GROWING A CHICKEN,
+THE PLAYER GROWS A MINIATURE VERSION OF THEIR OWN ROBLOX AVATAR.
+
+The player's real Roblox avatar becomes their little fighter.
+
+The marketing/product sentence is:
+
+"BRO, LOOK WHAT MY AVATAR TURNED INTO."
+
+That sentence should be used as a filter for major design decisions.
+
+Another shorthand:
+
+GROW YOURSELF.
+TRAIN.
+FIGHT.
+MUTATE.
+FUSE.
+ASCEND.
+BECOME RIDICULOUS.
+
+The fantasy is NOT:
+
+"I collected a rare pet."
+
+The fantasy is:
+
+"LOOK WHAT I TURNED MY ROBLOX AVATAR INTO."
+
+This player-identity angle is our primary differentiator and potential viral moat.
+
+============================================================
+1. WHAT THE GAME SHOULD FEEL LIKE
+============================================================
+
+This is extremely important.
+
+The game should be closer to:
+
+Grow a Chicken Fighter
++
+tycoon/simulator progression
++
+collection/build optimization
++
+social flexing
+
+NOT:
+
+a mechanically intensive action game where the player manually controls every attack.
+
+Most gameplay should be SEMI-AUTOMATIC or AUTOMATIC.
+
+The PLAYER:
+
+- chooses what their Mini should do
+- chooses training stations
+- chooses upgrades
+- chooses builds
+- chooses mutations
+- chooses fusion combinations
+- chooses which fights/challenges to enter
+- optimizes progression
+- collects Forms
+- watches progression
+- makes strategic choices
+
+The MINI:
+
+- trains automatically
+- fights automatically
+- performs attacks automatically
+- grows automatically from progression
+- uses its animations automatically
+- performs activities once commanded
+
+The player is essentially the coach/owner/builder of their own miniature fighter.
+
+Think:
+
+PLAYER CHOOSES ACTIVITY
+        ↓
+MINI DOES ACTIVITY
+        ↓
+REWARD
+        ↓
+UPGRADE / MUTATE / FUSE / PROGRESS
+        ↓
+WATCH MINI BECOME MORE RIDICULOUS
+        ↓
+REPEAT
+
+We specifically discussed that it should feel somewhat like a tycoon in how much of the repeated activity is automated.
+
+DO NOT drift into:
+
+"click every punch"
+"manual WASD fighting as the Mini"
+"four combat abilities constantly controlled by the player"
+"complex Souls-like combat"
+
+That is NOT the core game.
+
+============================================================
+2. GROW A CHICKEN FIGHTER REFERENCE LOOP
+============================================================
+
+The inspiration game has a very easy-to-understand progression structure along the lines of:
+
+HATCH / OBTAIN
+→ TRAIN
+→ FIGHT
+→ EARN
+→ FUSE
+→ TOWER
+→ REBIRTH
+→ OFFLINE PROGRESSION
+→ REPEAT
+
+It has chickens that:
+
+- get stronger
+- fight
+- generate rewards
+- can be fused
+- can have traits
+- progress through tower content
+- rebirth for further progression
+- continue producing/progressing offline
+
+This is the proven genre foundation we are adapting.
+
+OUR equivalent should roughly become:
+
+CREATE / AWAKEN MINI
+→ TRAIN
+→ FIGHT
+→ EARN
+→ MUTATE
+→ FUSE / MERGE FORMS
+→ CLIMB TOWER
+→ ASCEND
+→ OFFLINE TRAINING
+→ REPEAT
+
+Do not clone their exact implementation.
+
+We want to make THEIR proven structure better using OUR identity mechanic.
+
+============================================================
+3. THE MINI IS THE PRODUCT
+============================================================
+
+The Mini is not a pet.
+
+Avoid presenting it to the player as a "Pet".
+
+Terminology we like:
+
+MINI
+FORM
+MINI FORM
+
+The player should eventually own different FORMS of themselves.
+
+Example:
+
+ELIAS
+Normal
+Common
+
+↓
+
+ELIAS
+GIANT FISTS
+Rare
+
+↓
+
+ELIAS
+VOLT
+Epic
+
+↓
+
+ELIAS
+BERSERKER
+Legendary
+
+↓
+
+ELIAS
+VOID TITAN
+Mythic
+
+The player doesn't say:
+
+"I have six pets."
+
+They should feel:
+
+"I have six insane versions of myself."
+
+============================================================
+4. VISUAL PROGRESSION IS CRITICAL
+============================================================
+
+Progress cannot only be:
+
+Power 1,000
+→ Power 1,500
+→ Power 2,000
+
+The Mini must PHYSICALLY CHANGE.
+
+Example progression:
+
+Normal Mini
+→ slightly stronger/chunkier
+→ bigger fists
+→ aura
+→ different stance
+→ larger silhouette
+→ mutation
+→ evolution
+→ massive Mythic transformation
+
+Mutation readability rule:
+
+A GOOD MUTATION SHOULD BE READABLE FROM ABOUT 50 STUDS,
+ON A PHONE,
+EVEN IN GREYSCALE.
+
+Color alone is NOT enough.
+
+Use:
+
+- silhouette
+- body proportions
+- size
+- material
+- aura
+- horns
+- wings
+- floating pieces
+- animation
+- movement style
+- weapon/body changes
+
+Examples discussed:
+
+Giant Fists
+Volt
+Ember
+Titan
+Berserker
+Void
+Celestial
+Mecha
+Glitch
+Cosmic
+Flame
+Frost
+Toxic
+Angel
+Demon
+Ninja
+Vampire
+Corrupted
+Holographic
+
+DO NOT implement twenty mutations during MVP.
+
+Start with a tiny number that strongly prove the concept.
+
+============================================================
+5. CORE LOOPS
+============================================================
+
+MICRO LOOP — seconds:
+
+Mini performs activity
+→ satisfying animation
+→ impact
+→ reward
+→ number rises
+→ visual feedback
+
+SESSION LOOP — minutes:
+
+Train
+→ improve Power
+→ fight
+→ earn resources
+→ upgrade
+→ discover trait/mutation
+→ stronger opponent
+→ Tower/boss
+→ reward
+→ repeat
+
+META LOOP — days/weeks/months:
+
+Forms
+→ mutations
+→ build optimization
+→ fusion
+→ Tower progression
+→ Ascension
+→ collection completion
+→ rare mutations
+→ bosses
+→ social flex
+→ events
+→ leaderboards
+→ future guild/dojo systems
+
+============================================================
+6. FIRST SESSION / ONBOARDING VISION
+============================================================
+
+The first minute is extremely important.
+
+Avoid:
+
+- giant tutorial window
+- loading-menu hell
+- huge lobby before anything happens
+- explaining fifteen currencies
+
+Rough fantasy:
+
+0:00
+Player appears.
+
+0:01–0:03
+A tiny version of THEIR actual avatar appears.
+
+This alone should cause:
+
+"WTF that's me."
+
+Then:
+
+TRAIN YOUR MINI
+
+Mini approaches training station.
+
+WHACK.
+
++POWER.
+
+Then first growth feedback.
+
+Then first fight.
+
+Then first meaningful transformation relatively early.
+
+The first few minutes should answer:
+
+"What is this?"
+"My Mini is me."
+
+"What do I do?"
+"Make myself stronger."
+
+"Why keep playing?"
+"I want to see what my Mini turns into."
+
+============================================================
+7. TRAINING SHOULD BE AUTOMATED
+============================================================
+
+This was one of the latest important clarifications.
+
+Training should NOT become manual click-spam.
+
+Player activates a training activity.
+
+Example:
+
+Player walks to Punching Bag
+→ presses TRAIN / interacts once
+→ Mini automatically moves to bag
+→ performs several punches
+→ each successful impact adds Power
+→ bag reacts
+→ feedback happens
+→ training session ends
+→ Mini returns to player
+
+Example:
+
+TRAIN
+
+Mini:
+WHACK +1
+WHACK +1
+WHACK +1
+WHACK +1
+WHACK +1
+
+LEVEL UP
+
+BOOM
+
+This keeps the simulator/tycoon DNA.
+
+Future automation can become even more important.
+
+============================================================
+8. COMBAT VISION
+============================================================
+
+Combat should follow similar principles.
+
+The Mini primarily fights automatically.
+
+Player chooses:
+
+- opponent
+- Pit
+- Tower
+- boss
+- activity
+
+Mini enters.
+
+Mini fights.
+
+Eventually the player MAY get occasional meaningful interaction such as an Ultimate, but the game must not become a high-input action game.
+
+Possible future Pit:
+
+MINI VS NPC
+MINI VS FRIEND
+KING OF PIT
+SERVER BOSS
+TOURNAMENT
+
+Player can watch the little fighter perform.
+
+Big attacks should be entertaining and spectator-friendly.
+
+============================================================
+9. FUSION / MERGE — MAJOR FUTURE SYSTEM
+============================================================
+
+This is one of our strongest planned systems.
+
+The player will eventually acquire multiple FORMS of themselves.
+
+Example:
+
+ELIAS
+Volt
+Crit II
+
++
+
+ELIAS
+Giant
+Power III
+
+↓
+
+FUSION LAB
+
+Possible outcomes:
+
+52% GIANT+
+35% VOLT+
+11% THUNDER TITAN
+2% ???
+
+The player can eventually protect important traits.
+
+Then:
+
+two Minis enter chambers
+→ machine activates
+→ lights
+→ shake
+→ smoke
+→ silhouette
+→ reveal
+
+LEGENDARY
+THUNDER TITAN ELIAS
+
+This should be an enormous:
+
+progression
++
+collection
++
+optimization
++
+social
++
+viral
++
+monetization
+
+surface.
+
+But DO NOT build this before training and basic combat are fun.
+
+============================================================
+10. TOWER
+============================================================
+
+The Tower gives obvious progression without requiring many worlds initially.
+
+Example:
+
+Floor 1
+2
+3
+4
+5
+BOSS
+
+6
+7
+8
+9
+10
+BOSS
+
+Visible:
+
+SERVER BEST
+GLOBAL BEST
+
+The player always knows:
+
+"I'm on floor 37. I need to become strong enough for floor 38."
+
+This is intentionally simple.
+
+============================================================
+11. ASCENSION
+============================================================
+
+Instead of generic "Rebirth", we like:
+
+ASCEND
+
+Ascension resets some progression for permanent growth.
+
+Before confirming it should eventually clearly communicate:
+
+YOU LOSE:
+...
+
+YOU KEEP:
+...
+
+YOU GAIN:
+...
+
+Do not make resets confusing.
+
+============================================================
+12. OFFLINE PROGRESSION
+============================================================
+
+Very appropriate for this game.
+
+Fantasy:
+
+YOUR MINI KEPT TRAINING WHILE YOU WERE AWAY.
+
+Return screen:
+
+7h 18m
+
++ Training XP
++ resources
++ possible rare reward
+
+Mini could even visually look exhausted/sleeping beside gym equipment.
+
+Active play must still beat offline progression.
+
+============================================================
+13. SOCIAL / VIRAL SYSTEMS
+============================================================
+
+The entire Mini concept is naturally social.
+
+Important future idea:
+
+MINI VS FRIEND
+
+Your Mini automatically fights your friend's Mini.
+
+No permanent loss.
+
+Other players can watch.
+
+Other future social systems:
+
+- inspect another Mini
+- showcase strongest Mini
+- server Mini display
+- train together
+- duo boss
+- friend bonuses
+- invite rewards
+- server bosses
+- guild/dojo later
+
+Profile/flex information could eventually show:
+
+Best Mini
+Rarest Mutation
+Tower Floor
+Ascensions
+Wins
+Boss kills
+Collection %
+Titles
+Auras
+
+Inspecting somebody should make you think:
+
+"HOW DID THEY GET THAT?"
+
+============================================================
+14. VIRALITY
+============================================================
+
+The game itself should generate social-media moments.
+
+Core marketing line:
+
+"BRO LOOK WHAT MY AVATAR TURNED INTO."
+
+Potential video concepts:
+
+"I turned my Roblox avatar into a tiny fighter."
+
+"Every time my Roblox avatar wins he gets stronger."
+
+"I fused myself with myself and THIS happened."
+
+"1 hour vs 100 hours."
+
+"Can my Mini beat my friend's Mini?"
+
+"My Roblox avatar became a Void Titan."
+
+"I got the rarest mutation."
+
+"Only 0.01% found this form."
+
+Do NOT fake odds or gameplay.
+
+Gameplay should naturally create these clips.
+
+============================================================
+15. MINI PERSONALITY
+============================================================
+
+The Mini should feel like a tiny living version of the owner.
+
+Longer-term personality ideas:
+
+- follows owner
+- same idle/run/jump as owner
+- looks at player
+- celebrates
+- copies emotes
+- reacts to stronger Minis
+- sleeps
+- flexes
+- high-fives
+- reacts to bosses
+
+Some of this has already started technically.
+
+============================================================
+16. CURRENT TECHNICAL BREAKTHROUGH — R15 POSE MIRRORING
+============================================================
+
+THIS IS ALREADY WORKING.
+
+Do NOT replace it casually.
+
+Originally the project experimented with procedural walking and an R6 chibi rig.
+
+That looked unnatural.
+
+We changed direction.
+
+Current Mini is R15.
+
+The Mini copies the REAL PLAYER'S ANIMATED JOINT POSE.
+
+This means:
+
+player idle
+→ Mini same idle
+
+player run
+→ Mini same run
+
+player jump
+→ Mini same jump
+
+potentially player emote
+→ Mini same emote
+
+The Mini visually follows beside the player while mirroring their real Roblox animation.
+
+This was tested successfully.
+
+Output showed:
+
+[MiniController] pose mirror Derpking0505: 15 matching joints
+
+and after the real appearance swapped:
+
+[MiniController] pose mirror Derpking0505: 14 matching joints
+
+The user explicitly said it looked PERFECT.
+
+Jumping also works.
+
+THIS IS OUR NORMAL MOVEMENT SOLUTION.
+
+Do not return to procedural:
+
+sin() arm swings
+fake leg cycles
+fake bobbing
+fake running lean
+
+unless there is an extremely strong reason.
+
+============================================================
+17. CUSTOM MINI ACTIONS
+============================================================
+
+Our normal movement architecture should become:
+
+                 MINI
+                   |
+         --------------------
+         |                  |
+     NORMAL STATE       ACTION STATE
+         |                  |
+Mirror Player Pose      Custom Animation
+         |                  |
+Idle                   Punch
+Walk                   Attack
+Run                    Ultimate
+Jump                   Fusion
+Emote                  Celebrate
+
+When Mini performs its own activity:
+
+pause pose mirroring
+→ play custom R15 Mini action animation
+→ activity completes
+→ resume pose mirroring
+
+This is the basis for:
+
+Training
+Combat
+Ultimates
+Mutation reveals
+Fusion
+Victory
+Boss attacks
+
+============================================================
+18. CUSTOM PUNCH ANIMATION ALREADY EXISTS
+============================================================
+
+The user has created a FULL R15 PUNCH ANIMATION in Roblox Animation Editor.
+
+ANIMATION ID:
+
+128885657069580
+
+Use:
+
+rbxassetid://128885657069580
+
+The intended use is the first automated Punching Bag training animation.
+
+IMPORTANT:
+
+The user has created the animation, but at handoff time the final Training system has NOT yet been confirmed tested.
+
+A V0.4.1 Auto Training implementation was proposed in the previous chat, but DO NOT ASSUME IT HAS BEEN APPLIED.
+
+First inspect:
+
+git status
+git branch
+git log
+repository files
+
+before assuming anything.
+
+============================================================
+19. CURRENT WORKING MINI APPEARANCE
+============================================================
+
+Current Mini appearance has been tested visually.
+
+Originally hair disappeared.
+
+Root issue discovered:
+
+The old filter assumed:
+
+IsLayered == body clothing
+
+which is false because important identity accessories such as Hair/Hat/Face can also appear as layered accessories.
+
+We changed the logic to preserve identity accessories.
+
+Result:
+
+hair returned.
+
+The user said the Mini looked perfect and approved moving forward.
+
+Current product rule:
+
+IDENTITY > PREMATURE OPTIMIZATION.
+
+Do not remove the player's hair/accessories/clothing simply to save a few parts unless performance data proves it necessary.
+
+============================================================
+20. CURRENT AVATAR ARCHITECTURE
+============================================================
+
+Current preferred implementation:
+
+- fetch player's HumanoidDescription server-side
+- build a real R15 model
+- preserve player identity
+- use Roblox model scaling rather than inventing a custom incompatible skeleton
+- Mini is roughly small/collectible-sized
+- normal player pose is mirrored to Mini
+
+Earlier R6 RigScaler code may still exist in repository history or source.
+
+R6 was Candidate A and was technically elegant, but R15 won because:
+
+- better modern avatar compatibility
+- better identity retention
+- layered clothing support
+- same topology as normal player
+- pose mirroring
+- more natural animations
+
+Do NOT revert to R6 without strong evidence.
+
+============================================================
+21. REPOSITORY
+============================================================
+
+GitHub repository:
+
+https://github.com/BADYHADY/Grow-a-mini
+
+Local Windows path:
+
+C:\Users\elias\OneDrive\Dokument\Roblox Grow a mini me fighter
+
+Rojo is used to sync source to Roblox Studio.
+
+Toolchain includes Rokit/Rojo.
+
+Previously:
+
+rojo = rojo-rbx/rojo@7.7.0
+
+A Rojo server may already be running on:
+
+127.0.0.1:34872
+
+If:
+
+rojo serve
+
+returns:
+
+address already in use / os error 10048
+
+check whether an existing Rojo process is already running rather than launching duplicates.
+
+============================================================
+22. GIT STATE — VERIFY FIRST
+============================================================
+
+Earlier branch used:
+
+dev/v0.2-mini-runtime
+
+We discussed merging the completed Mini foundation to main and creating:
+
+dev/v0.4-training
+
+BUT THE USER MAY NOT HAVE RUN THOSE COMMANDS YET.
+
+Therefore:
+
+DO NOT GUESS CURRENT BRANCH STATE.
+
+Before changing anything ask for or inspect:
+
+git status
+git branch
+git log --oneline --decorate -10
+
+Current known commits from earlier included:
+
+Phase 1.1 project skeleton
+Phase 1.2 MiniAvatarService/chibi experiment
+
+Then several local/new changes were made during our development.
+
+Verify reality first.
+
+============================================================
+23. EXISTING PROJECT ARCHITECTURE
+============================================================
+
+The project was set up modularly using:
+
+src/shared
+src/server
+src/client
+
+Important files/services seen in repo include approximately:
+
+src/shared/Config/
+    GameConfig.luau
+    MiniConfig.luau
+    MutationConfig.luau
+    EconomyConfig.luau
+    EnemyConfig.luau
+    UpgradeConfig.luau
+
+src/shared/Net/
+    Remotes.luau
+
+src/shared/Types/
+    MiniSnapshot.luau
+    Profile.luau
+    Service.luau
+
+src/shared/Util/
+    various utilities
+    old RigScaler may still exist
+
+src/shared/Packages/
+    ProfileStore.luau
+
+src/server/Services/
+    AnalyticsService.luau
+    DataService.luau
+    MiniAvatarService.luau
+    MiniService.luau
+
+src/client/Controllers/
+    DebugController.luau
+    MiniController.luau
+
+Explicit server/client Init/Start loaders are used.
+
+Do not turn this into one mega script.
+
+============================================================
+24. REMOTE / SECURITY PHILOSOPHY
+============================================================
+
+The existing Remotes architecture had good ideas and should generally be preserved.
+
+Client-to-server traffic is INTENT only.
+
+Server decides:
+
+- currencies
+- damage
+- rewards
+- rarity
+- items
+- mutations
+- purchases
+- inventory
+- Power
+- Tower rewards
+- Ascension rewards
+
+Client owns:
+
+- presentation
+- camera
+- VFX
+- UI
+- visual interpolation
+- local animation presentation
+
+Every ClientToServer Remote should:
+
+- be declared
+- have rate limiting
+- validate payloads server-side
+
+The client should NEVER say:
+
+"I dealt 500 damage."
+
+It says something like:
+
+"I requested attack X."
+
+Server verifies and decides.
+
+============================================================
+25. DATA ARCHITECTURE
+============================================================
+
+DataService uses ProfileStore.
+
+Goals:
+
+- session locking
+- schema versioning
+- migration table
+- Studio mock data by default
+- safe player-leave handling
+- future offline progression
+
+During testing Studio Output reports:
+
+[ProfileStore]: Roblox API services unavailable - data will not be saved
+
+This is expected while running mock/Studio without live API access.
+
+DO NOT mistake it for gameplay failure.
+
+We found one important migration issue previously:
+
+Reconcile() must NOT erase knowledge of an old schema version before migrations know what version data was on.
+
+A patch was written to migrate before reconcile / safely handle old profiles.
+
+Verify the current DataService retains the safe ordering.
+
+============================================================
+26. MINI SNAPSHOT
+============================================================
+
+A MiniSnapshot type was introduced early.
+
+Reason:
+
+future features need a serializable frozen description of a player's Mini:
+
+- Day 1 vs Day 30
+- inspect
+- async/offline challenges
+- historical appearance/progression
+
+Potential stored information:
+
+UserId
+DisplayName
+CapturedUnix
+Level
+Mutations
+Appearance
+Stats
+
+This is a good concept.
+
+Do not overbuild it yet, but retain compatibility.
+
+============================================================
+27. ANALYTICS
+============================================================
+
+AnalyticsService exists already.
+
+Early funnel concepts include:
+
+SessionStart
+CharacterLoaded
+MiniGenerated
+MiniAppearanceApplied
+FirstAttack
+FirstKill
+FirstUpgrade
+AbilityUnlocked
+FirstBossKill
+FirstMutation
+PitEntered
+Min5
+Min10
+
+The project should eventually care heavily about:
+
+first-play bounce
+first activity completion
+first fight
+first mutation
+5-minute retention
+10-minute session
+D1
+D7
+D30
+co-play
+payer conversion
+ARPPU
+
+But gameplay quality comes first.
+
+Do not build huge monetization before retention works.
+
+============================================================
+28. PERFORMANCE
+============================================================
+
+Mobile-first.
+
+Earlier config targets included approximately:
+
+MaxPlayersPerServer = 20
+MaxActiveMinis = 24
+MaxActiveEnemies = 40
+
+Do NOT blindly assume those numbers are perfect.
+
+Profile.
+
+The current design deliberately uses CLIENT visual following for Minis rather than asking server to replicate every Mini's CFrame every render frame.
+
+Server owns gameplay state.
+
+Client handles smooth presentation.
+
+Good principle.
+
+============================================================
+29. MUTATION DESIGN ALREADY STARTED
+============================================================
+
+An early MutationConfig existed with examples such as:
+
+Giant Fists
+Ember
+Titan
+
+Important existing rule:
+
+mutation readability at distance.
+
+Example mechanisms:
+
+Giant Fists:
+silhouette
+
+Ember:
+aura/trail
+
+Titan:
+scale/material
+
+This is a good design direction.
+
+However, don't let existing placeholder configs dictate final game design.
+
+============================================================
+30. FIRST TRAINING SYSTEM — NEXT DEVELOPMENT TASK
+============================================================
+
+THIS IS WHERE DEVELOPMENT SHOULD CONTINUE.
+
+We now have:
+
+- recognizable Mini
+- R15 Mini
+- hair/accessories
+- follow
+- real player animation mirroring
+- jump mirroring
+- custom punch animation ID
+
+Next:
+
+V0.4 TRAINING
+
+Create ONE polished automatic training station.
+
+Prototype flow:
+
+player approaches Punching Bag
+→ prompt "Train Mini"
+→ presses once
+→ Mini temporarily enters ActionState
+→ pose mirroring stops
+→ Mini automatically walks/moves to training position
+→ faces punching bag
+→ plays animation 128885657069580
+→ bag reacts on impact
+→ +POWER
+→ repeats several times
+→ session ends
+→ Mini returns to normal follow
+→ pose mirroring resumes
+
+DO NOT require player to click every punch.
+
+That violates the game direction.
+
+============================================================
+31. TRAINING POWER LOOP
+============================================================
+
+For prototype, keep it simple.
+
+Example:
+
+Power 0
+
+WHACK
+
++1 POWER
+
+Power 1
+
+WHACK
+
++1 POWER
+
+Power 2
+
+etc.
+
+After a small threshold:
+
+LEVEL UP
+
+Eventually visual growth should occur.
+
+The important prototype is:
+
+ACTION
+→ IMPACT
+→ REWARD
+→ VISUAL FEEDBACK
+→ PROGRESSION
+
+The numbers are not sacred yet.
+
+============================================================
+32. PUNCHING BAG FEEL
+============================================================
+
+At impact:
+
+animation hits
+→ bag snaps/recoils
+→ punch sound
+→ subtle shockwave/VFX
+→ floating "+1 POWER"
+→ maybe camera/visual micro-feedback
+→ Mini recovers
+→ next punch
+
+The FIRST punch should feel satisfying.
+
+Training must feel good before adding ten stations.
+
+============================================================
+33. PUNCHING BAG ART
+============================================================
+
+The user may ask Claude or another tool to create nice punching bags/training props.
+
+If external assets are created/imported:
+
+ONLY use clean visual assets.
+
+No scripts.
+No LocalScripts.
+No ModuleScripts.
+No require(assetId).
+No obfuscated code.
+No loaders.
+
+The user's earlier Roblox development experienced suspicious external models, so security matters.
+
+============================================================
+34. FUTURE GAME MAP
+============================================================
+
+Do NOT build a giant world yet.
+
+Eventually imagine a clear training/fighter hub with:
+
+MINI LAB
+GYM
+PIT
+FUSION LAB
+TOWER
+ASCENSION SHRINE
+SHOWCASE
+
+The world should physically show long-term goals.
+
+Example:
+
+huge Tower visible in distance.
+
+Other players' crazy evolved Minis should constantly create aspiration.
+
+============================================================
+35. GUI DIRECTION
+============================================================
+
+Clean Roblox simulator UX.
+
+Not button soup.
+
+Possible HUD:
+
+TOP:
+Coins
+Power / important resource
+
+LEFT:
+Minis/Forms
+Collection
+Tower
+Quests
+
+RIGHT:
+Shop
+Rewards
+
+Opening Mini should emphasize big 3D preview:
+
+ELIAS
+
+VOID
+MYTHIC
+
+POWER 42.6K
+
+Traits:
+Overcharged
+Heavy Hands
+Berserker
+
+Buttons eventually:
+
+TRAIN
+EQUIP
+FUSE
+
+Mobile-first:
+large touch targets
+minimal tiny text
+minimal overlap
+no click-through bugs.
+
+============================================================
+36. ECONOMY
+============================================================
+
+Do not create ten currencies.
+
+Potential launch currencies/concepts:
+
+Coins
+Power/Training progression
+Mutation Material
+Ascension Core
+
+Exact economy is NOT locked yet.
+
+Every currency must have:
+
+source
+sink
+purpose
+
+Avoid currency soup.
+
+============================================================
+37. MONETIZATION
+============================================================
+
+We believe the concept has strong monetization potential, but:
+
+RETENTION FIRST.
+MONETIZATION SECOND.
+
+Potential future monetization:
+
+- extra Mini/Form storage
+- additional loadouts
+- convenience
+- cosmetic packs
+- trait protection / build optimization
+- temporary training boost
+- drop boost
+- event currency
+- VIP/QoL
+- subscriptions only later
+- rewarded video at natural breaks
+
+Fusion/trait optimization may become one of the strongest monetization surfaces.
+
+Important:
+
+free gameplay must remain fun.
+
+Avoid:
+
+- making free users miserable
+- constant intrusive purchase prompts
+- deceptive lootbox systems
+- unclear paid randomness
+
+============================================================
+38. PRODUCT PRIORITY ORDER
+============================================================
+
+When making decisions, use this hierarchy:
+
+1. IS IT FUN?
+2. IS IT IMMEDIATELY UNDERSTANDABLE?
+3. DOES IT STRENGTHEN "MY AVATAR IS MY FIGHTER"?
+4. DOES IT IMPROVE THE FIRST SESSION?
+5. DOES IT IMPROVE RETENTION?
+6. DOES IT CREATE SOCIAL/FLEX VALUE?
+7. DOES IT CREATE SHAREABLE MOMENTS?
+8. CAN IT MONETIZE WITHOUT DAMAGING 1–7?
+9. IS IT MAINTAINABLE?
+10. IS IT WORTH THE DEVELOPMENT TIME?
+
+============================================================
+39. FEATURE-BLOAT RULE
+============================================================
+
+When a new idea appears classify it:
+
+CORE
+HIGH VALUE
+LATER
+BAD IDEA
+
+The protected sentence is:
+
+"GROW YOURSELF INTO AN INSANE MINI FIGHTER."
+
+If a system doesn't strengthen that fantasy, question whether it belongs.
+
+Do NOT build:
+
+guilds
+trading
+world 8
+100 mutations
+20 bosses
+season pass
+complex crafting
+
+before the core loop works.
+
+============================================================
+40. DEVELOPMENT ROADMAP
+============================================================
+
+Approximate direction:
+
+V0.1
+FOUNDATION
+
+DONE/mostly done:
+architecture
+data
+remotes
+analytics
+configs
+
+V0.2
+MINI
+
+DONE and visually tested:
+player avatar → Mini
+identity
+hair/accessories
+R15
+follow
+
+V0.3
+MINI MOTION
+
+DONE and approved:
+R15 pose mirroring
+player run
+idle
+jump
+follow
+
+V0.4
+TRAINING
+
+NEXT:
+punching bag
+automatic training
+custom punch
+Power
+impact feedback
+first tiny growth
+
+V0.5
+PIT / FIRST COMBAT
+
+Mini automatically fights first NPC.
+
+V0.6
+MUTATIONS
+
+first 3 meaningful visual transformations
+
+V0.7
+FUSION
+
+Forms
+traits
+inheritance
+rare outcomes
+reveal sequence
+
+V0.8
+TOWER
+
+10 floors
+1 boss
+
+V0.9
+META / RETENTION
+
+saving
+offline training
+Ascension
+return loop
+
+V0.10
+SOCIAL
+
+inspect
+Mini vs Friend
+showcase
+
+V0.11
+MONETIZATION
+
+only after core retention looks promising
+
+V0.12
+FIRST 10 MINUTES POLISH
+
+then:
+
+V1.0 SOFT LAUNCH
+
+============================================================
+41. DEBUGGING / DEVELOPMENT STANDARD
+============================================================
+
+Do not rewrite 20 systems because one thing broke.
+
+Use:
+
+REPRODUCE
+→ IDENTIFY SUBSYSTEM
+→ READ CURRENT CODE
+→ FIND ROOT CAUSE
+→ APPLY SMALLEST SAFE PATCH
+→ TEST
+→ REGRESSION TEST
+→ COMMIT
+
+Avoid giant version-guard installers.
+
+Avoid 10,000-line copy-paste scripts.
+
+Keep changes modular.
+
+When providing patches to the user:
+
+prefer one PowerShell patch block that safely edits/creates a small set of files.
+
+Patch should validate expected base before modifying files.
+
+Use:
+
+git diff --check
+git diff --stat
+git status
+
+before commit.
+
+============================================================
+42. USER WORKFLOW
+============================================================
+
+User is on Windows.
+
+PowerShell version previously did NOT accept && as a separator.
+
+Use separate commands or semicolon.
+
+Local project:
+
+C:\Users\elias\OneDrive\Dokument\Roblox Grow a mini me fighter
+
+GitHub:
+
+https://github.com/BADYHADY/Grow-a-mini
+
+Rojo syncs code into Studio.
+
+The normal development loop should be:
+
+AI designs/writes small patch
+↓
+user applies
+↓
+Rojo sync
+↓
+user presses Play
+↓
+user sends Output/video/screenshot
+↓
+AI inspects
+↓
+fix/improve
+↓
+commit when verified
+
+The user is very willing to send:
+screenshots
+videos
+Output logs
+
+Use them.
+
+============================================================
+43. LANGUAGE PREFERENCE
+============================================================
+
+Talk to the user in SWEDISH.
+
+Code:
+ENGLISH.
+
+GUI text:
+ENGLISH.
+
+Variable names:
+ENGLISH.
+
+Comments:
+ENGLISH.
+
+============================================================
+44. IMPORTANT USER PREFERENCE
+============================================================
+
+The user strongly believes in this idea and wants to move QUICKLY.
+
+But moving quickly must mean:
+
+fast iteration around the core loop
+
+NOT:
+
+shipping huge amounts of untested code.
+
+The user wants this to have genuine potential to reach Roblox Top 100 and make substantial revenue.
+
+Do not promise Top 100 is guaranteed.
+
+Optimize our probability by:
+
+strong hook
+retention
+game feel
+viral identity mechanic
+social play
+live ops
+monetization
+rapid analytics-driven iteration.
+
+============================================================
+45. THE MAIN DESIGN WARNING
+============================================================
+
+DO NOT ALLOW THE PROJECT TO DRIFT INTO A DIFFERENT GAME.
+
+The user specifically stopped development and reminded us:
+
+"most things should happen automatically, almost like a tycoon"
+
+and:
+
+"don't forget this is our spin on Grow a Chicken Fighter."
+
+THIS IS EXTREMELY IMPORTANT.
+
+If you're ever unsure whether to make gameplay:
+
+more manually controlled
+
+or
+
+more automated with strategic player decisions
+
+default toward the SECOND one.
+
+============================================================
+46. WHAT IS SPECIAL ABOUT OUR VERSION
+============================================================
+
+Grow a Chicken Fighter:
+
+"Look at my rare chicken."
+
+Our game:
+
+"LOOK WHAT I TURNED MYSELF INTO."
+
+That means every major system should exploit player identity.
+
+Training:
+MY Mini gets stronger.
+
+Fight:
+MY Mini beats yours.
+
+Mutation:
+MY avatar became a monster.
+
+Fusion:
+I fused two versions of MYSELF.
+
+Tower:
+MY Mini reached floor 100.
+
+Offline:
+MY Mini trained while I slept.
+
+Social:
+MY Mini vs my friend's Mini.
+
+Collection:
+all the versions of ME I have unlocked.
+
+This is the product.
+
+============================================================
+47. WHAT TO DO FIRST IN THIS NEW CHAT
+============================================================
+
+DO NOT immediately write 5,000 lines of new code.
+
+FIRST:
+
+1. Read this handoff completely.
+
+2. Confirm the vision in one concise summary:
+   Grow a Chicken Fighter-style simulator/tycoon loop where the fighter is a Mini version of the player's own Roblox avatar.
+
+3. Inspect current repository state:
+   https://github.com/BADYHADY/Grow-a-mini
+
+4. Determine the REAL current branch and files.
+   Do not assume V0.4.1 was applied.
+
+5. Verify V0.3.3 Mini foundation remains intact:
+   - R15
+   - appearance
+   - hair
+   - follow
+   - pose mirroring
+   - jump
+
+6. Continue with V0.4:
+   AUTO TRAINING / PUNCHING BAG.
+
+7. Use animation:
+   rbxassetid://128885657069580
+
+8. Build ONLY enough to prove:
+   Train
+   → Mini automatically punches
+   → impact feels good
+   → +Power
+   → visual progression
+   → Mini returns to owner.
+
+Then have the user test it.
+
+============================================================
+48. FINAL NORTH STAR
+============================================================
+
+Never forget this:
+
+THIS IS NOT A GAME ABOUT OWNING A LITTLE NPC.
+
+THIS IS A GAME ABOUT GROWING YOURSELF.
+
+The player should eventually be able to join a server with their normal Roblox avatar standing beside something absolutely absurd like:
+
+VOID CELESTIAL TITAN
+ELIAS
+MYTHIC
+POWER 18.4B
+
+and another player should immediately stop and think:
+
+"WHAT THE HELL IS THAT AND HOW DO I GET IT?"
+
+That curiosity is one of our primary progression, retention, social and viral engines.
+
+The dream reaction remains:
+
+"BRO, LOOK WHAT MY AVATAR TURNED INTO."
+
+Now continue developing the game from the current repository state.
+Protect the Grow a Chicken Fighter-inspired automated simulator loop.
+Do not drift from the Mini-Me identity fantasy.
+Ship small, testable iterations.
+Make the core extremely satisfying before adding breadth.
