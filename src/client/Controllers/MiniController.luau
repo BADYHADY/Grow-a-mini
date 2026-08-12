@@ -1102,521 +1102,55 @@ states[instance] = nil
 end
 
 
-local function targetPosition(
-state: MiniState,
-root: BasePart,
-character: Model
-): Vector3
-
-local raw =
-root.CFrame:PointToWorldSpace(
-Vector3.new(
-SETTINGS.SideOffsetStuds,
-0,
-SETTINGS.BackOffsetStuds
-)
-)
-
-raycastParams.FilterDescendantsInstances = {
-character,
-minisFolder,
-}
-
-
-local origin =
-Vector3.new(
-raw.X,
-raw.Y
-+ SETTINGS.GroundProbeHeightStuds,
-raw.Z
-)
-
-
-local hit =
-Workspace:Raycast(
-origin,
-
-Vector3.new(
-0,
--SETTINGS.GroundProbeDistanceStuds,
-0
-),
-
-raycastParams
-)
-
-
-if hit then
-return Vector3.new(
-raw.X,
-
-hit.Position.Y
-+ state.groundOffset,
-
-raw.Z
-)
-end
-
-
-return Vector3.new(
-raw.X,
-state.position.Y,
-raw.Z
-)
-end
-
-
--- The server publishes what the Mini is doing as attributes on the model.
--- States in which the Mini is throwing punches once it has arrived: at the bag,
--- or at whatever the tower has put in front of it.
+-- The states in which there is something in front of the Mini to hit.
 local PUNCHING_STATES = {
 Training = true,
 Fighting = true,
 }
 
--- How close counts as having passed a waypoint. Loose on purpose: waypoints are
--- corners to round, not marks to hit, and the arrival easing would have the Mini
--- braking to a crawl at every one of them.
-local ROUTE_WAYPOINT_RADIUS = 1.6
+-- How close to its mark the Mini has to be before it starts throwing punches.
+-- The Humanoid parks within a fraction of a stud of where it was sent, and the
+-- punch was measured against the bag with that slack already in it.
+local WORKING_RADIUS_STUDS = 0.9
 
 
--- The floor the Mini is allowed to roam, measured off the real dojo by
--- MiniBaseService and published on the base. Falls back to a small circle
--- around the training spot for a base built before that existed.
-local function wanderArea(state: MiniState, spot: CFrame): (Vector3, Vector2)
-local bases = Workspace:FindFirstChild("MiniBases")
-local base = bases and bases:FindFirstChild(`MiniBase_{state.owner.UserId}`)
-
-local centre = base and base:GetAttribute("WanderCenter")
-local extents = base and base:GetAttribute("WanderExtents")
-
-if typeof(centre) == "Vector3" and typeof(extents) == "Vector2" then
--- The floor's own Y is the model's centre, not its surface. The training
--- spot is already on the surface, so take the height from there.
-return Vector3.new(centre.X, spot.Position.Y, centre.Z), extents
-end
-
-return spot.Position, Vector2.new(WANDER.RadiusStuds, WANDER.RadiusStuds)
-end
-
-
--- While it is topped up the Mini has nowhere it needs to be, so it goes and
--- lives its own life on the dojo floor: crosses the mat, stops, looks around,
--- picks somewhere else. That aimless pottering is the "ready" signal -- no popup
--- tells the player anything, they just see it stop working and start mooching.
+-- WHERE the Mini is is no longer decided here.
 --
--- Returns where it is heading, and what to face when it gets there. A facing of
--- nil means "look where you are walking".
-local function wanderTarget(
-state: MiniState,
-spot: CFrame
-): (Vector3, Vector3?)
-
-local now = os.clock()
-local arrived =
-state.wanderTarget ~= nil
-and (horizontal(state.position - state.wanderTarget)).Magnitude
-< WANDER.ArriveRadiusStuds
-
--- Standing at the last spot with time still on the clock: this is the pause,
--- and the Mini spends it turning to look at things rather than freezing
--- mid-floor like a mannequin.
-if state.wanderTarget and (now < state.wanderPauseUntil or not arrived) then
-if arrived and now >= state.wanderLookUntil then
-local angle = math.random() * math.pi * 2
-
-state.wanderLook = Vector3.new(math.cos(angle), 0, math.sin(angle))
-state.wanderLookUntil = now
-+ WANDER.LookSecondsMin
-+ math.random() * (WANDER.LookSecondsMax - WANDER.LookSecondsMin)
-end
-
-return state.wanderTarget, if arrived then state.wanderLook else nil
-end
-
-
-local centre, extents = wanderArea(state, spot)
-
--- Somewhere else on the mat, and deliberately not somewhere near: a Mini that
--- shuffles six inches at a time reads as broken rather than as restless.
-local target
-
-for _ = 1, 6 do
-local candidate = centre
-+ Vector3.new(
-(math.random() * 2 - 1) * extents.X,
-0,
-(math.random() * 2 - 1) * extents.Y
-)
-
-target = candidate
-
-if not state.wanderTarget
-or (horizontal(candidate - state.wanderTarget)).Magnitude
-> WANDER.MinTripStuds
-then
-break
-end
-end
-
-state.wanderTarget = target
-state.wanderPauseUntil = now
-+ WANDER.PauseSecondsMin
-+ math.random() * (WANDER.PauseSecondsMax - WANDER.PauseSecondsMin)
--- Cleared so the Mini picks a fresh thing to look at once it arrives.
-state.wanderLookUntil = 0
-
-return state.wanderTarget, nil
-end
-
-
--- Anything other than Follow means the Mini has somewhere of its own to be, and
--- stops tracking the owner.
-local function actionTarget(
-state: MiniState
-): (Vector3?, Vector3?)
-
+-- It is a physical Humanoid, walked by the server with Humanoid:MoveTo along a
+-- pathfinding route. The engine owns steering, ground, slopes, acceleration and
+-- the walk cycle. Roughly five hundred lines of hand-written locomotion used to
+-- live at this spot -- arrival easing, ground raycasts, catch-up speeds, a
+-- snap-back for falling behind, wander targets -- and the sum of it was a Mini
+-- that slid across the floor rather than walked over it. Deleting it IS the
+-- fix; there is no version of that code that beats the engine at its own job.
+--
+-- What the client still owns is presentation: the punch, the pose, the bag, the
+-- sound. All of which need exactly one thing from the body, and that is whether
+-- the fighter has arrived at its mark.
+local function updateWorking(state: MiniState)
 local model = state.model
 local action = model:GetAttribute("ActionState")
-
-if action == nil or action == "Follow" then
-return nil, nil
-end
-
-
 local spot = model:GetAttribute("ActionCFrame")
 
-if typeof(spot) ~= "CFrame" then
-return nil, nil
-end
-
-
-if action == "Ready" then
-local target, facing = wanderTarget(state, spot)
-
--- Facing is nil while it is walking, so it looks where it is going; once it
--- arrives the wander hands us something for it to turn and look at.
-return target + Vector3.new(0, state.groundOffset, 0), facing
-end
-
-
-state.wanderTarget = nil
-
-
--- The map is a dojo platform, a bridge and an arena plate strung out over a
--- hundred studs, so the server sends a ROUTE rather than a destination: walk
--- to point 1, then 2, then 3. Without it the Mini walks the straight line
--- from the bag to the Colyseum, which goes through open air.
-local count = model:GetAttribute("RouteCount")
-
--- Any live route means the Mini is on a journey the server planned, however
--- long. That is what holds off the snap-back -- including on the final leg,
--- which is the 24-stud walk in over the sand, and including a one-point
--- route, which is what a failed path falls back to.
-state.followingRoute = type(count) == "number" and count > 0
-
-if type(count) == "number" and count > 0 then
--- Restart the route whenever the server issues a new one.
-if state.routeSignature ~= `{action}:{count}:{tostring(spot.Position)}` then
-state.routeSignature = `{action}:{count}:{tostring(spot.Position)}`
-state.routeIndex = 1
-end
-
-while state.routeIndex < count do
-local leg = model:GetAttribute(`RoutePoint{state.routeIndex}`)
-
-if typeof(leg) ~= "Vector3" then
-break
-end
-
--- Waypoints are only markers to pass near, not marks to stand on, so
--- the tolerance is loose. The LAST one is the real spot and is handled
--- by falling out of this loop.
-if (horizontal(state.position - leg)).Magnitude > ROUTE_WAYPOINT_RADIUS then
-return leg + Vector3.new(0, state.groundOffset, 0), nil
-end
-
-state.routeIndex += 1
-end
-end
-
-
--- The server hands us a point ON the floor, while the Mini is positioned by
--- its pivot. Same convention the ground raycast uses.
-return spot.Position
-+ Vector3.new(0, state.groundOffset, 0),
-
-spot.LookVector
-end
-
-
-local function updateRoot(
-state: MiniState,
-dt: number
-)
-local desired, desiredForward =
-actionTarget(state)
-
-local training = desired ~= nil
-
-
-if not desired then
--- Follow: track the owner, as before.
-local character =
-state.owner.Character
-
-if not character then
+if not PUNCHING_STATES[action] or typeof(spot) ~= "CFrame" then
+state.working = false
+state.impactPending = false
 return
 end
 
+-- Punching starts on arrival, not on the order. The mark is generous: the
+-- Humanoid parks within a fraction of a stud, and the punch itself was
+-- measured against the bag with that slack already in it.
+local reach = (horizontal(state.position - spot.Position)).Magnitude
 
-local root =
-character:FindFirstChild(
-"HumanoidRootPart"
-)
-
-if not root
-or not root:IsA("BasePart")
-then
-return
-end
-
-
-desired =
-targetPosition(
-state,
-root,
-character
-)
-
-desiredForward =
-safeUnit(
-root.CFrame.LookVector,
-state.forward
-)
-end
-
-
-local flatCurrent =
-horizontal(state.position)
-
-local flatDesired =
-horizontal(desired)
-
-local difference =
-flatDesired - flatCurrent
-
-local distance =
-difference.Magnitude
-
-
--- It only starts punching once it has actually arrived at the mark, and only
--- in a state where there is something in front of it to hit.
-local action = state.model:GetAttribute("ActionState")
-
-if training
-and PUNCHING_STATES[action]
-then
-if distance <= TRAINING.ArriveRadiusStuds then
+if reach <= WORKING_RADIUS_STUDS then
 state.working = true
-end
-
-else
+elseif reach > WORKING_RADIUS_STUDS * 2 then
+-- Hysteresis: knocked back or shoved off the mark mid-fight is not a
+-- reason to stop swinging, but walking away is.
 state.working = false
 state.impactPending = false
 end
-
-
--- The snap-back exists for a Mini that has fallen impossibly far behind its
--- owner. It must NOT fire while the Mini is walking a route the server gave
--- it: the map is over a hundred studs end to end, so the trip to the
--- Colyseum is legitimately further than this, and snapping would blink the
--- fighter to the arena instead of letting the player watch it walk there.
-if distance >= MiniConfig.TeleportDistanceStuds
-and not state.followingRoute
-then
-state.position = desired
-state.velocity = Vector3.zero
-
-else
-local desiredVelocity =
-Vector3.zero
-
-
--- A punching mark is a precise spot; a place to stand about is not.
-local stopRadius =
-if action == "Ready"
-then 0.25
-elseif training
-then TRAINING.SpotToleranceStuds
-else SETTINGS.StopRadiusStuds
-
-
-if distance
-> stopRadius
-then
-local direction =
-difference.Unit
-
-
-local arrival =
-math.clamp(
-(
-distance
-- stopRadius
-)
-/ SETTINGS.ArrivalRadiusStuds,
-
-0,
-1
-)
-
-
-arrival =
-arrival
-* arrival
-* (3 - 2 * arrival)
-
-
-local catchMultiplier = 1
-
-
-if distance
-> SETTINGS.CatchUpStartStuds
-then
-catchMultiplier =
-math.clamp(
-distance
-/ SETTINGS.CatchUpStartStuds,
-
-1,
-SETTINGS.MaxSpeedMultiplier
-)
-end
-
-
--- Three speeds, and the difference is the whole point: an idle Mini ambles,
--- a Mini with somewhere to be jogs there, and a Mini keeping up with a
--- sprinting player moves at whatever that takes.
-local topSpeed =
-if action == "Ready"
-then WANDER.SpeedStuds
-elseif training
-then WANDER.TravelSpeedStuds
-else MiniConfig.MoveSpeed
-
-
-desiredVelocity =
-direction
-* topSpeed
-* arrival
-* catchMultiplier
-end
-
-
-local acceleration =
-if desiredVelocity.Magnitude
-> state.velocity.Magnitude
-then
-SETTINGS.AccelerationStudsPerSecond2
-else
-SETTINGS.DecelerationStudsPerSecond2
-
-
-state.velocity =
-moveTowards(
-state.velocity,
-desiredVelocity,
-acceleration * dt
-)
-
-
-local travel =
-state.velocity * dt
-
-
-if distance > 0
-and travel.Magnitude > distance
-then
-state.position =
-Vector3.new(
-desired.X,
-state.position.Y,
-desired.Z
-)
-
-state.velocity =
-Vector3.zero
-
-else
-state.position += travel
-end
-
-
-local yAlpha =
-expAlpha(
-SETTINGS.VerticalResponsiveness,
-dt
-)
-
-
-state.position =
-Vector3.new(
-state.position.X,
-
-state.position.Y
-+ (
-desired.Y
-- state.position.Y
-)
-* yAlpha,
-
-state.position.Z
-)
-end
-
-
--- Facing comes from the REAL avatar when following, or from the action spot
--- when training. No fake wobble, lean, bob or procedural turning either way.
--- With no facing handed to us -- wandering, or walking home -- the Mini looks
--- where it is going, and holds its last heading once it stops.
-if not desiredForward
-and state.velocity.Magnitude > 0.15
-then
-desiredForward = state.velocity
-end
-
-
-desiredForward =
-safeUnit(
-desiredForward or state.forward,
-state.forward
-)
-
-
-state.forward =
-safeUnit(
-state.forward:Lerp(
-desiredForward,
-
-expAlpha(
-SETTINGS.TurnResponsiveness,
-dt
-)
-),
-
-state.forward
-)
-
-
-local pivot =
-CFrame.lookAt(
-state.position,
-state.position + state.forward
-)
-
-
-state.model:PivotTo(pivot)
 end
 
 
@@ -1643,26 +1177,29 @@ function MiniController.Start()
 -- PreSimulation fires, so copy it here.
 RunService.PreSimulation:Connect(function(dt)
 for _, state in states do
-local action = state.model:GetAttribute("ActionState")
+-- Read where the server's Humanoid has actually put the Mini. Everything
+-- below -- which way the punch faces, how fast the legs should cycle,
+-- which way the bag swings -- is derived from the real body rather than
+-- from a prediction of it.
+local pivot = state.model:GetPivot()
+local moved = pivot.Position - state.position
 
--- Anything but following its owner is the Mini going somewhere under its
--- own steam: to the bag, out to the pit, home again, or just about. All of
--- it needs its own legs, because the owner may well be standing still.
-local onOwnBusiness =
-action ~= nil
-and action ~= "Follow"
-and not state.working
+state.position = pivot.Position
+state.velocity = if dt > 0 then moved / dt else Vector3.zero
+state.forward = safeUnit(horizontal(pivot.LookVector), state.forward)
 
--- Hysteresis on the speed, so a Mini hovering at the threshold does not
--- strobe between walking and standing.
+-- Whether it is walking is now a question about the body, not about what
+-- we told it to do: it is walking if it is moving.
 local speed = horizontal(state.velocity).Magnitude
 
-if onOwnBusiness and speed > WANDER.AnimateAboveStuds then
+if not state.working and speed > WANDER.AnimateAboveStuds then
 setWalking(state, true, speed)
-elseif not onOwnBusiness or speed < WANDER.AnimateBelowStuds then
+elseif state.working or speed < WANDER.AnimateBelowStuds then
 setWalking(state, false, speed)
 end
 
+
+updateWorking(state)
 
 if state.working then
 trainingPose(state)
@@ -1680,14 +1217,14 @@ end
 end)
 
 
-RunService.PreRender:Connect(function(dt)
-for _, state in states do
-updateRoot(
-state,
-dt
-)
-end
-end)
+-- The Mini's POSITION is no longer ours. It is a physical Humanoid walked by
+-- the server with MoveTo, so the engine handles steering, ground, slopes and
+-- the walk cycle -- all of which it does better than the hand-written
+-- simulation that used to live in a PreRender loop here, and which is why the
+-- Mini used to slide instead of walk.
+--
+-- What is left on the client is what the client should own: the punch, the
+-- pose, the bag, the sound. See updateWorking's header.
 
 end
 

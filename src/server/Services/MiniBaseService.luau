@@ -307,6 +307,44 @@ local function buildArena(base: Model, plate: BasePart): boolean
 	arena:SetAttribute("FloorY", floorY)
 	arena:SetAttribute("FloorRadius", radius)
 
+	-- The model is one solid mesh with no doorway cut into it, so a physical
+	-- fighter cannot get onto the sand: it walks up to the outer wall and stops
+	-- dead. Until the mesh has a gate, the building is scenery and the walkable
+	-- parts are invisible -- a floor to stand on and a ramp to climb in by, both
+	-- placed from the measurements above so they follow the model.
+	for _, descendant in arena:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.CanCollide = false
+		end
+	end
+
+	local sand = makePart(
+		"ArenaFloor",
+		Vector3.new(0.4, radius * 2, radius * 2),
+		Color3.fromRGB(214, 190, 142),
+		CFrame.new(plate.Position.X, floorY - 0.2, plate.Position.Z)
+			* CFrame.Angles(0, 0, math.rad(90)),
+		base
+	)
+	sand.Shape = Enum.PartType.Cylinder
+	sand.Transparency = 1
+
+	local rise = floorY - surfaceY(plate)
+	local run = math.max(rise * 3, 4)
+
+	local ramp = makePart(
+		"ArenaRamp",
+		Vector3.new(math.max(3, radius), 0.4, math.sqrt(rise * rise + run * run)),
+		Color3.fromRGB(214, 190, 142),
+		CFrame.new(
+			plate.Position.X,
+			surfaceY(plate) + rise * 0.5,
+			plate.Position.Z - radius - run * 0.5
+		) * CFrame.Angles(-math.atan2(rise, run), 0, 0),
+		base
+	)
+	ramp.Transparency = 1
+
 	if GameConfig.DebugLogging then
 		print(string.format(
 			"[MiniBaseService] arena scaled %.3f, floor Y %.2f, fighting radius %.2f",
@@ -490,13 +528,33 @@ local function buildBase(player: Player, slot: number): Model
 
 	-- The dojo sits at the back of its own space, so the Mini has the floor in
 	-- front of it to walk around on and the player has somewhere to stand.
+	-- Turned to face the bridge. The model is open on ONE side, and that opening
+	-- has to point at the rest of the map: a Mini sent to the Colyseum walks out
+	-- of it in a straight line. Facing the other way, the fighter's route led
+	-- through the back wall -- which the old hand-written movement simply slid
+	-- through, and a physical body cannot.
 	local dojo = dojoTemplate:Clone()
 	dojo.Name = "Dojo"
-	dojo:PivotTo(CFrame.new(
-		dojoSpace.Position.X,
-		dojoTop + metrics.dojoPivotToBottom,
-		dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 + metrics.dojoFootprint * 0.5 + 1.0
-	))
+	dojo:PivotTo(
+		CFrame.new(
+			dojoSpace.Position.X,
+			dojoTop + metrics.dojoPivotToBottom,
+			dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 + metrics.dojoFootprint * 0.5 + 1.0
+		)
+		* CFrame.Angles(0, math.pi, 0)
+	)
+	-- The dojo is a knee-high toy set, and its walls are scenery. Pathfinding
+	-- does not put these mesh walls into its navmesh, so it happily plans routes
+	-- through them -- and a physical Mini then walks into one and stops dead.
+	-- Rather than fight that, only the FLOOR collides. The Mini stands on the
+	-- mat and can always get to the doorway; nothing can wedge it in a corner of
+	-- a building four studs wide.
+	for _, descendant in dojo:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.CanCollide = descendant.Name:lower():find("floor") ~= nil
+		end
+	end
+
 	dojo.Parent = base
 
 	local bag = bagTemplate:Clone()
@@ -504,7 +562,8 @@ local function buildBase(player: Player, slot: number): Model
 	bag:PivotTo(CFrame.new(
 		dojo:GetPivot().Position.X,
 		dojoTop + interiorFloorLift() + metrics.bagPivotToBottom,
-		dojo:GetPivot().Position.Z + CONFIG.BagOffsetZ
+		-- At the CLOSED end, so the Mini punches with its back to the doorway.
+		dojo:GetPivot().Position.Z - CONFIG.BagOffsetZ
 	))
 	bag.Parent = base
 
@@ -595,19 +654,25 @@ local function placePlayerAtBase(player: Player, character: Model)
 		return
 	end
 
-	-- On the near edge of their own dojo platform, looking down the length of
-	-- the map: dojo in front of them, bridge beyond it, arena at the end. The
-	-- whole loop is one glance from where they land.
+	-- Beside the dojo's OPEN face, not behind it.
+	--
+	-- The Mini spawns next to its owner, and the dojo is a closed box with one
+	-- doorway. Landing the player behind the back wall put the Mini there too,
+	-- with no way in: it walked into the wall and stayed there. Standing them
+	-- off to the side of the opening means the Mini's first walk is straight
+	-- through the door, and the player is looking into the dojo with the bridge
+	-- and the Colyseum stretching away behind it.
+	local dojo = base:FindFirstChild("Dojo")
 	local standY = surfaceY(dojoSpace) + 3
+	local dojoZ = if dojo then dojo:GetPivot().Position.Z else dojoSpace.Position.Z
+	local lookAt = Vector3.new(dojoSpace.Position.X, standY, dojoZ)
+
 	local target = CFrame.new(
-		dojoSpace.Position.X,
+		dojoSpace.Position.X - dojoSpace.Size.X * 0.5 + 3.0,
 		standY,
-		dojoSpace.Position.Z - dojoSpace.Size.Z * 0.5 + 2.0
+		dojoZ + metrics.dojoFootprint * 0.9
 	)
-	local facing = CFrame.lookAt(
-		target.Position,
-		Vector3.new(dojoSpace.Position.X, standY, dojoSpace.Position.Z + dojoSpace.Size.Z)
-	)
+	local facing = CFrame.lookAt(target.Position, lookAt)
 
 	for attempt = 1, 6 do
 		if character.Parent == nil then
@@ -675,9 +740,11 @@ function MiniBaseService.getTrainingCFrame(player: Player, reach: number?): CFra
 	local body = MiniBaseService.getBagBody(player)
 	local target = body
 		and Vector3.new(body.Position.X, floorY, body.Position.Z)
-		or (dojo:GetPivot().Position + Vector3.new(0, 0, CONFIG.BagOffsetZ))
+		or (dojo:GetPivot().Position - Vector3.new(0, 0, CONFIG.BagOffsetZ))
 
-	local spot = target - Vector3.new(0, 0, CONFIG.StandOffFromBagZ * (reach or 1))
+	-- Stood on the doorway side of the bag, facing into the dojo. Walking away
+	-- afterwards is then a straight line out and down the bridge.
+	local spot = target + Vector3.new(0, 0, CONFIG.StandOffFromBagZ * (reach or 1))
 
 	return CFrame.lookAt(spot, target)
 end

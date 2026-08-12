@@ -51,6 +51,138 @@ route: { Vector3 }?,
 },
 } = {}
 
+--[[ Walking ]]
+--
+-- The Mini is moved by the ENGINE, not by us. Humanoid:MoveTo walks it, the
+-- Humanoid state machine picks up running and landing, and the Animator plays
+-- the walk cycle -- all of which Roblox does better than a hand-written
+-- simulation, and all of which is why the Mini used to slide rather than walk.
+--
+-- The server drives it because where the Mini is IS part of what it is doing.
+-- The client no longer guesses.
+
+-- Bumped whenever a new order arrives, which is how the walk in progress knows
+-- to abandon what it was doing. This is what makes a command instant: press
+-- FOLLOW ME mid-journey and the current leg is dropped on the spot.
+local walkGenerations: { [Player]: number } = {}
+
+-- Humanoid:MoveTo abandons the walk after eight seconds; a long leg is simply
+-- re-issued before that runs out.
+local WALK_REISSUE_SECONDS = 0.25
+-- Waypoints are corners to round, not marks to hit.
+local WALK_ARRIVE_RADIUS = 1.2
+-- If a leg is not done by now the Mini is stuck on something. Move on.
+local WALK_LEG_TIMEOUT = 20
+
+local function humanoidOf(mini: Model?): Humanoid?
+	return mini and mini:FindFirstChildOfClass("Humanoid") or nil
+end
+
+-- Walk one leg. Humanoid:MoveTo gives up on its own after eight seconds, so a
+-- long leg has to be re-issued; returns false if the order was superseded.
+local function walkLeg(
+	player: Player,
+	humanoid: Humanoid,
+	point: Vector3,
+	generation: number
+): boolean
+	local deadline = os.clock() + WALK_LEG_TIMEOUT
+
+	while os.clock() < deadline do
+		if walkGenerations[player] ~= generation or not humanoid.Parent then
+			return false
+		end
+
+		humanoid:MoveTo(point)
+
+		local root = humanoid.RootPart
+
+		if root then
+			local flat = Vector3.new(
+				point.X - root.Position.X,
+				0,
+				point.Z - root.Position.Z
+			)
+
+			if flat.Magnitude <= WALK_ARRIVE_RADIUS then
+				return true
+			end
+		end
+
+		task.wait(WALK_REISSUE_SECONDS)
+	end
+
+	-- Out of time: something is in the way. Give up on this leg rather than
+	-- standing in place forever -- the next one may well be reachable.
+	return true
+end
+
+-- Where the walk currently under way is headed, so a new order for the SAME
+-- place does not restart it. The tower issues a fresh Fighting action for every
+-- floor, and without this each floor cancelled the walk to the arena -- leaving
+-- the Mini fighting the whole run from inside its own dojo.
+local walkDestinations: { [Player]: Vector3 } = {}
+
+-- The generation of the journey still under way, if any. Callers wait on this
+-- rather than on a stopwatch: a walk across the map takes as long as it takes,
+-- and guessing produced a Mini that was ordered home again while still walking
+-- home -- so it turned round and went back for the order it had already been
+-- given.
+local walkActive: { [Player]: number? } = {}
+
+local function driveRoute(player: Player, mini: Model, route: { Vector3 }?, facing: CFrame?)
+	local generation = (walkGenerations[player] or 0) + 1
+	walkGenerations[player] = generation
+	walkDestinations[player] = route and route[#route] or nil
+	walkActive[player] = generation
+
+	if GameConfig.DebugLogging then
+		print(string.format(
+			"[MiniService] %s walk gen %d: %d leg(s)",
+			player.Name, generation, route and #route or 0
+		))
+	end
+
+	task.spawn(function()
+		local humanoid = humanoidOf(mini)
+
+		if not humanoid then
+			warn(`[MiniService] {player.Name} walk gen {generation}: no humanoid`)
+			return
+		end
+
+		for index, point in route or {} do
+			if not walkLeg(player, humanoid, point, generation) then
+				if GameConfig.DebugLogging then
+					print(string.format(
+						"[MiniService] %s walk gen %d superseded on leg %d/%d",
+						player.Name, generation, index, #route
+					))
+				end
+				return
+			end
+		end
+
+		if walkGenerations[player] ~= generation then
+			return
+		end
+
+		walkActive[player] = nil
+
+		-- Stop walking, and square up. A fighter that arrives facing the wrong
+		-- way punches past the bag.
+		humanoid:MoveTo(humanoid.RootPart and humanoid.RootPart.Position or Vector3.zero)
+
+		if facing and mini.PrimaryPart then
+			local root = mini.PrimaryPart
+			root.CFrame = CFrame.lookAt(
+				root.Position,
+				root.Position + facing.LookVector
+			)
+		end
+	end)
+end
+
 -- The action is published as attributes. Attributes replicate on their own, so
 -- every client -- not just the owner -- sees the same Mini doing the same
 -- thing, and no remote is needed.
@@ -93,6 +225,35 @@ local function applyAction(player: Player, mini: Model?)
 
 	-- Set last: the client reads the others when this changes.
 	mini:SetAttribute("ActionState", action.state)
+
+	-- And actually go. Issued on every action change, which is what makes a
+	-- command take effect the instant it is pressed: the walk in progress is
+	-- superseded rather than allowed to finish.
+	if action.state == "Follow" then
+		-- Following tracks a moving target, so it is stepped continuously
+		-- rather than walked once. Cancel whatever journey was under way.
+		walkGenerations[player] = (walkGenerations[player] or 0) + 1
+		walkDestinations[player] = nil
+		return
+	end
+
+	if action.route then
+		driveRoute(player, mini, action.route, action.cframe)
+		return
+	end
+
+	-- No route with this order. If a walk is already under way to the same
+	-- place, it is still the right walk -- leave it alone. This is the
+	-- between-floors case: the tower re-issues Fighting for every floor while
+	-- the Mini is still crossing the bridge to get there.
+	local heading = walkDestinations[player]
+	local spot = action.cframe
+
+	if spot and heading and (heading - spot.Position).Magnitude < WALK_ARRIVE_RADIUS then
+		return
+	end
+
+	driveRoute(player, mini, if spot then { spot.Position } else nil, spot)
 end
 
 -- Growth is applied to the model rather than baked into the avatar build, so a
@@ -158,6 +319,25 @@ local deltaY = characterFloorY - miniFloorY
 mini:PivotTo(
 CFrame.new(0, deltaY, 0) * mini:GetPivot()
 )
+end
+
+-- Unanchored parts standing next to a player are handed to that player's client
+-- automatically, and our client no longer simulates the Mini at all -- so the
+-- server would push the body and have the change immediately overwritten by a
+-- client reporting that nothing moved. Claiming ownership is what makes
+-- Humanoid:MoveTo actually move anything.
+local function claimPhysics(mini: Model)
+	local root = mini.PrimaryPart
+
+	if not root or root.Anchored then
+		return
+	end
+
+	local ok, err = pcall(root.SetNetworkOwner, root, nil)
+
+	if not ok then
+		warn(`[MiniService] could not claim physics ownership: {err}`)
+	end
 end
 
 local function loadAppearance(
@@ -238,6 +418,7 @@ scaleMini(realMini, MiniService.getGrowth(player))
 -- Preserve the exact placeholder position for a visually clean swap.
 realMini:PivotTo(current:GetPivot())
 realMini.Parent = minisFolder
+claimPhysics(realMini)
 
 current:Destroy()
 minis[player] = realMini
@@ -278,6 +459,7 @@ mini:SetAttribute("AppearanceReady", false)
 scaleMini(mini, MiniService.getGrowth(player))
 
 mini.Parent = minisFolder
+claimPhysics(mini)
 
 placeBesideCharacter(character, mini)
 
@@ -379,10 +561,16 @@ end
 -- position off the model. It does not need to: the last place it TOLD the Mini
 -- to go is where the Mini is, and a following Mini is next to its owner.
 local function currentAnchor(player: Player): Vector3?
-local action = actions[player]
+-- The Mini is a physical body the server drives, so its position is simply
+-- read off it. This used to reason from the last place the Mini was TOLD to
+-- go, because the client owned movement and the server could not know where it
+-- had ended up. Planning a route from an imagined position is how the Mini got
+-- shoved into the back wall of its own dojo: pathfinding was solving from a
+-- point it was not standing on.
+local mini = minis[player]
 
-if action and action.cframe and action.state ~= "Follow" then
-return action.cframe.Position
+if mini and mini.PrimaryPart then
+return mini.PrimaryPart.Position
 end
 
 local character = player.Character
@@ -582,6 +770,12 @@ route = if spot then routeTo(player, spot.Position) else nil,
 applyAction(player, minis[player])
 end
 
+-- True while the Mini is still walking somewhere it was sent. Used instead of a
+-- fixed delay by anything that has to happen ON ARRIVAL.
+function MiniService.isWalking(player: Player): boolean
+return walkActive[player] ~= nil
+end
+
 function MiniService.getAction(player: Player): string
 local action = actions[player]
 return action and action.state or "Follow"
@@ -597,6 +791,110 @@ return nil, nil
 end
 
 return action.epoch, action.rate
+end
+
+--[[ The two states that have no fixed destination ]]
+--
+-- Following chases a target that keeps moving, and wandering has no destination
+-- at all until it picks one. Both are stepped rather than walked once, so they
+-- live here instead of going through driveRoute.
+
+-- Where the Mini is loitering next, per player, and until when.
+local wanderSpots: { [Player]: { point: Vector3, until_: number } } = {}
+
+local function stepFollow(player: Player, mini: Model, humanoid: Humanoid)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+
+	if not root or not mini.PrimaryPart then
+		return
+	end
+
+	-- Just behind and to the side, the way a person walks with a dog. Standing
+	-- ON the owner reads as a bug; trailing them reads as company.
+	local beside = root.CFrame * CFrame.new(
+		MiniConfig.Personality.SideOffsetStuds,
+		0,
+		MiniConfig.Personality.BackOffsetStuds
+	)
+	local distance = (mini.PrimaryPart.Position - beside.Position).Magnitude
+
+	-- A dead zone, so a Mini standing next to a stationary player does not
+	-- twitch back and forth over the exact spot.
+	if distance > MiniConfig.FollowDistanceStuds * 0.4 then
+		humanoid:MoveTo(beside.Position)
+	end
+end
+
+local function stepWander(player: Player, mini: Model, humanoid: Humanoid)
+	local base = MiniBaseService.getBase(player)
+	local centre = base and base:GetAttribute("WanderCenter")
+	local extents = base and base:GetAttribute("WanderExtents")
+
+	if typeof(centre) ~= "Vector3" or typeof(extents) ~= "Vector2" then
+		return
+	end
+
+	local spot = wanderSpots[player]
+	local root = mini.PrimaryPart
+
+	if not root then
+		return
+	end
+
+	local arrived = spot
+		and (Vector3.new(root.Position.X, 0, root.Position.Z)
+			- Vector3.new(spot.point.X, 0, spot.point.Z)).Magnitude
+			< WALK_ARRIVE_RADIUS
+
+	if spot and not arrived then
+		humanoid:MoveTo(spot.point)
+		return
+	end
+
+	-- Standing at the last spot: wait a bit, then pick somewhere else. The
+	-- spread in the pause is what stops it looking like it is on a timer.
+	if spot and os.clock() < spot.until_ then
+		return
+	end
+
+	local WANDER = MiniConfig.Wander
+
+	wanderSpots[player] = {
+		point = centre + Vector3.new(
+			(math.random() * 2 - 1) * extents.X,
+			0,
+			(math.random() * 2 - 1) * extents.Y
+		),
+		until_ = os.clock()
+			+ WANDER.PauseSecondsMin
+			+ math.random() * (WANDER.PauseSecondsMax - WANDER.PauseSecondsMin),
+	}
+end
+
+local function stepLoiterStates()
+	for player, mini in minis do
+		local action = actions[player]
+		local state = action and action.state
+
+		if state ~= "Follow" and state ~= "Ready" then
+			wanderSpots[player] = nil
+			continue
+		end
+
+		local humanoid = humanoidOf(mini)
+
+		if not humanoid or not mini.Parent then
+			continue
+		end
+
+		if state == "Follow" then
+			wanderSpots[player] = nil
+			stepFollow(player, mini, humanoid)
+		else
+			stepWander(player, mini, humanoid)
+		end
+	end
 end
 
 function MiniService.Init(registry)
@@ -626,6 +924,20 @@ end
 
 function MiniService.Start()
 Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Four times a second is plenty to re-aim a walk; MoveTo does the actual
+-- steering every frame on its own.
+task.spawn(function()
+while true do
+task.wait(0.25)
+
+local ok, err = pcall(stepLoiterStates)
+
+if not ok then
+warn(`[MiniService] loiter step failed: {err}`)
+end
+end
+end)
 
 Players.PlayerRemoving:Connect(function(player)
 nextGeneration(player)

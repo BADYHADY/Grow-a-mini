@@ -8,6 +8,7 @@
 -- R6 animation skeleton. This lets the Mini inherit modern avatar appearance
 -- and allows the client to mirror the owner's real animated pose.
 
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -19,6 +20,10 @@ local APPEARANCE = MiniConfig.Appearance
 local SCALE = MiniConfig.Scale
 
 local MiniAvatarService = {}
+
+-- Named here rather than in config: these are physics plumbing, not tuning.
+MiniAvatarService.CollisionGroup = "Minis"
+local PLAYER_COLLISION_GROUP = "Players"
 
 type CacheEntry = {
 description: HumanoidDescription,
@@ -35,20 +40,38 @@ Enum.HumanoidDisplayDistanceType.None
 humanoid.NameDisplayDistance = 0
 humanoid.HealthDisplayDistance = 0
 
-humanoid.EvaluateStateMachine = false
+-- The state machine is what MAKES a Humanoid walk: running, landing, falling,
+-- and the animations that go with each. We used to switch it off and move the
+-- rig by hand, which is exactly why the Mini slid around instead of walking.
+humanoid.EvaluateStateMachine = true
 humanoid.RequiresNeck = false
 humanoid.BreakJointsOnDeath = false
+
+-- A two-stud fighter needs a two-stud fighter's stride, not an adult's.
+humanoid.WalkSpeed = MiniConfig.Wander.TravelSpeedStuds
+humanoid.AutoRotate = true
 end
 
 
-local function makeLightweight(model: Model)
+-- Set the rig up to be moved by the engine rather than by us. The Mini walks
+-- with Humanoid:MoveTo from here on, so it needs to be a real physical body:
+-- unanchored, standing on the floor, colliding with the world.
+local function makePhysical(model: Model)
 for _, descendant in model:GetDescendants() do
 if descendant:IsA("BasePart") then
-descendant.CanCollide = false
+descendant.Anchored = false
+-- Nothing should be able to shoot, click or trigger the Mini, and it must
+-- not block the pathfinding rays that plan its own route.
 descendant.CanQuery = false
 descendant.CanTouch = false
-descendant.Massless = true
 descendant.CastShadow = false
+
+-- The root is the Humanoid's own collision volume; the limbs hanging off
+-- it must not also collide, or the rig snags on its own geometry.
+descendant.CanCollide = descendant.Name ~= "HumanoidRootPart"
+descendant.Massless = descendant.Name ~= "HumanoidRootPart"
+
+descendant.CollisionGroup = MiniAvatarService.CollisionGroup
 end
 end
 end
@@ -129,7 +152,7 @@ function MiniAvatarService.finalise(model: Model)
 -- joints. That is essential for pose mirroring.
 model:ScaleTo(SCALE.Overall)
 
-makeLightweight(model)
+makePhysical(model)
 
 local humanoid =
 model:FindFirstChildOfClass("Humanoid")
@@ -143,7 +166,6 @@ model:FindFirstChild("HumanoidRootPart")
 
 if root and root:IsA("BasePart") then
 model.PrimaryPart = root
-root.Anchored = true
 end
 end
 
@@ -219,10 +241,66 @@ return model
 end
 
 
+-- Minis are physical bodies now, which means they can be shoved. A player who
+-- can barge their own fighter off the bridge is a bug, and twenty Minis piling
+-- into each other in a shared world is worse. Both are solved by collision
+-- groups rather than by turning collision off, which would drop them through
+-- the floor.
+local function setUpCollisionGroups()
+	for _, name in { MiniAvatarService.CollisionGroup, PLAYER_COLLISION_GROUP } do
+		if not PhysicsService:IsCollisionGroupRegistered(name) then
+			PhysicsService:RegisterCollisionGroup(name)
+		end
+	end
+
+	-- They still collide with the world -- that is what keeps them on the
+	-- bridge -- just not with each other or with people.
+	PhysicsService:CollisionGroupSetCollidable(
+		MiniAvatarService.CollisionGroup,
+		MiniAvatarService.CollisionGroup,
+		false
+	)
+	PhysicsService:CollisionGroupSetCollidable(
+		MiniAvatarService.CollisionGroup,
+		PLAYER_COLLISION_GROUP,
+		false
+	)
+end
+
+local function claimCharacter(character: Model)
+	for _, descendant in character:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.CollisionGroup = PLAYER_COLLISION_GROUP
+		end
+	end
+
+	character.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("BasePart") then
+			descendant.CollisionGroup = PLAYER_COLLISION_GROUP
+		end
+	end)
+end
+
 function MiniAvatarService.Init()
-Players.PlayerRemoving:Connect(function(player)
-descriptionCache[player.UserId] = nil
-end)
+	setUpCollisionGroups()
+
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(claimCharacter)
+
+		if player.Character then
+			claimCharacter(player.Character)
+		end
+	end
+
+	Players.PlayerAdded:Connect(watch)
+
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+
+	Players.PlayerRemoving:Connect(function(player)
+		descriptionCache[player.UserId] = nil
+	end)
 end
 
 

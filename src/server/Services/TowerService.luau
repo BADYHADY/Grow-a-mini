@@ -23,7 +23,9 @@ local TOWER = MiniConfig.Tower
 
 -- How long the Mini is left walking home before it gets back on the bag. The
 -- walk itself is client-side; this is just when the payout clock restarts.
-local WALK_HOME_SECONDS = 3.0
+-- Backstop only. The walk home normally ends when the Mini arrives; this stops
+-- a fighter wedged on some piece of geometry from never training again.
+local WALK_HOME_TIMEOUT = 45.0
 
 local TowerService = {}
 
@@ -221,7 +223,21 @@ local function finishRun(player: Player, run: Run, floorsCleared: number)
 
 	-- Walks itself home and gets straight back on the bag. The player never has
 	-- to fetch it; the loop closes on its own.
-	task.delay(WALK_HOME_SECONDS, function()
+	--
+	-- Waits for the Mini to ARRIVE rather than for a stopwatch. The walk home is
+	-- the length of the map now, and a fixed delay re-ordered the Mini to the
+	-- dojo while it was still on the bridge walking to the dojo -- which sent it
+	-- back to the arena to start the journey it was already halfway through.
+	task.spawn(function()
+		local deadline = os.clock() + WALK_HOME_TIMEOUT
+
+		repeat
+			task.wait(0.2)
+		until not MiniService.isWalking(player)
+			or os.clock() > deadline
+			or runs[player] ~= run
+			or player.Parent ~= Players
+
 		if runs[player] ~= run or player.Parent ~= Players then
 			return
 		end
