@@ -20,7 +20,7 @@ local EconomyConfig = require(Shared.Config.EconomyConfig)
 local MiniConfig = require(Shared.Config.MiniConfig)
 
 local STORE_NAME = "PlayerData"
-local CURRENT_SCHEMA_VERSION = 3
+local CURRENT_SCHEMA_VERSION = 4
 
 -- Studio runs against ProfileStore's in-memory mock so iteration never burns
 -- live DataStore budget or corrupts real saves. Note the mock does NOT survive
@@ -41,9 +41,9 @@ local TEMPLATE = {
 	Mini = {
 		Level = 1,
 		Xp = 0,
-		Power = 0,
-		-- A new Mini wakes up weak and trains its way up. Existing profiles are
-		-- migrated to FULL health instead -- see MIGRATIONS[2].
+		Power = MiniConfig.BaseStats.Power,
+		-- A new Mini wakes up at full health and strong enough to win its first
+		-- few fights; the bag is where it goes AFTER something beats it.
 		Health = math.floor(
 			MiniConfig.BaseStats.Health * MiniConfig.Training.StartingHealthFraction
 		),
@@ -115,6 +115,20 @@ end
 
 mini.TowerFloor = MiniConfig.Tower.StartFloor
 mini.BestFloor = 0
+end,
+
+-- V0.9: a Mini is born with Power. Anyone who joined while the starting value
+-- was zero, and who has not trained since, is holding a fighter that deals one
+-- point a punch. Lift them to the new floor without touching anyone who has
+-- actually earned more than it.
+[4] = function(data: any)
+local mini = data.Mini
+
+if type(mini) ~= "table" then
+return
+end
+
+mini.Power = math.max(tonumber(mini.Power) or 0, MiniConfig.BaseStats.Power)
 end,
 }
 

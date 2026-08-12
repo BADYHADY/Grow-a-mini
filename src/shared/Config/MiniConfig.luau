@@ -308,9 +308,21 @@ FullPersonalityDistanceStuds = 80,
 	CoinsBase = 8,
 	CoinsGrowth = 1.35,
 
+	-- How fast the Mini swings IN A FIGHT, as against on the bag. Kept separate
+	-- from BaseStats.AttacksPerSecond because the two are doing different jobs:
+	-- training is a rhythm to watch, a fight is a thing to get through. At the
+	-- shared rate of one punch a second, an opening opponent that dies in two
+	-- hits still took six seconds -- four times the pace the fight is meant to
+	-- have.
+	AttackRate = 2.4,
+	-- How long after arriving the first punch connects. Small on purpose: the
+	-- Mini should look like it walked in already swinging.
+	WindupSeconds = 0.15,
+
 	-- Beat between floors, so a cleared floor reads as a win rather than the
-	-- next enemy blinking into existence.
-	FloorBreakSeconds = 1.1,
+	-- next enemy blinking into existence. Long enough to register the win, and
+	-- no longer -- this pause is dead air, and it used to be twice this.
+	FloorBreakSeconds = 0.5,
 	-- How long the Mini lies there after losing. Long enough to register that it
 	-- lost, short enough that nobody taps away.
 	KnockoutSeconds = 1.6,
@@ -328,5 +340,18 @@ FullPersonalityDistanceStuds = 80,
 		CritChance = 0.05,
 		CritMultiplier = 2.0,
 		Health = 300,
+
+	-- What one punch is worth before a single session on the bag, and the
+	-- reason a new Mini is a fighter rather than a spectator.
+	--
+	-- This used to be zero. A Mini also spawns at FULL health now, and full
+	-- health legitimately earns nothing on the bag -- that is the anti-farm
+	-- rule and it is right. The two together left a new player with a Mini
+	-- that could not train and hit for the one-point damage floor, so its
+	-- opening opponent took forty punches instead of two. The first thing a
+	-- player ever sees has to be a win.
+	--
+	-- Sized against floor 1: two punches, a little under a second.
+	Power = 20,
 	},
 }

@@ -596,6 +596,33 @@ local function buildBase(player: Player, slot: number): Model
 	-- level is something you look at while you move it.
 	local base = mapTemplate:Clone()
 	base.Name = `MiniBase_{player.UserId}`
+
+	-- The platforms have to be flat rectangular blocks, and this enforces it.
+	--
+	-- Every measurement in this file -- surfaceY, the slot spacing, where the
+	-- dojo stands, where the arena sinks to -- reads Position and Size and
+	-- assumes the part is an axis-aligned box. A Part's Size does NOT tell you
+	-- that: an ArenaPlate authored as a Cylinder reported Size (26, 1, 26) while
+	-- physically being a 26-stud ROD one stud thick, because a Roblox cylinder
+	-- runs along its X axis with a radius of min(Y, Z) / 2. The plate measured
+	-- correct, drew correct, and had solid ground only along a single line
+	-- through its middle. The Mini walked to the Colyseum and fell in the water.
+	--
+	-- Shape is therefore normalised here rather than trusted, and said out loud,
+	-- so that sculpting the map in Studio can never silently delete the ground.
+	for _, platform in { "DojoSpace", "Bridge", "ArenaPlate" } do
+		local part = base:FindFirstChild(platform)
+
+		if part and part:IsA("Part") and part.Shape ~= Enum.PartType.Block then
+			warn(string.format(
+				"[MiniBaseService] %s is a %s, not a Block -- forcing it flat. Round"
+				.. " platforms have to be decoration on top of a block, or nothing"
+				.. " can stand on them.",
+				platform, part.Shape.Name
+			))
+			part.Shape = Enum.PartType.Block
+		end
+	end
 	base:SetAttribute("OwnerUserId", player.UserId)
 	base:SetAttribute("Slot", slot)
 

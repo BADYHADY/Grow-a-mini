@@ -712,11 +712,24 @@ function MiniService.enterFighting(player: Player, spot: CFrame, settleSeconds: 
 -- route to walk and no reason to pay for one.
 local delay = settleSeconds or walkSecondsTo(player, spot.Position)
 
+-- A fight is faster than a training session. Training is a rhythm the player
+-- watches for a minute at a time; a fight is meant to be over. Sharing one
+-- rate made floor 1 -- an opponent two punches wide -- take six seconds.
+local rate = MiniConfig.Tower.AttackRate
+
+-- Punch ONE lands almost as soon as the Mini is on the mark.
+--
+-- The clock counts punch N as floor((now - epoch) * rate), so an epoch set to
+-- the arrival time means the first hit does not land until a whole punch
+-- period later. With the break between floors on top of it, every cleared
+-- opponent was followed by two seconds of a Mini standing perfectly still in
+-- front of the next one. Backdating the epoch by very nearly one period puts
+-- the swing already in progress on arrival, so it connects immediately.
 actions[player] = {
 state = "Fighting",
 cframe = spot,
-rate = MiniConfig.BaseStats.AttacksPerSecond,
-epoch = Workspace:GetServerTimeNow() + delay,
+rate = rate,
+epoch = Workspace:GetServerTimeNow() + delay - 1 / rate + MiniConfig.Tower.WindupSeconds,
 }
 applyAction(player, minis[player])
 end
